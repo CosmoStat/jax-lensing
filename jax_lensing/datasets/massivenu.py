@@ -69,4 +69,3 @@ class MassiveNu(tfds.core.GeneratorBasedBuilder):
         f.close()
 
       yield '%d'%i, {"map": im}
-
