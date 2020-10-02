@@ -120,17 +120,23 @@ def main(_):
     # Interpolate the Power Spectrum in Fourier Space
     power_map = jnp.array(make_power_map(ps_halofit, 320, kps=kell))
 
-  # Training loss
-  def loss_fn(params, state, rng_key, batch):
+  @jax.jit
+  def score_fn(params, state, rng_key, batch):
     if FLAGS.gaussian_prior:
       # If requested, first compute the Gaussian prior
       gaussian_score = gaussian_prior_score(batch['y'], batch['s'], power_map)
-      net_input = jnp.concatenate([batch['y'], 0.1 * batch['s'] * gaussian_score],axis=-1)
-      res, state = model.apply(params, state, rng_key, batch['y'], batch['s'], is_training=True)
+      net_input = jnp.concatenate([batch['y'], jnp.abs(batch['s']) * gaussian_score],axis=-1)
+      res, state = model.apply(params, state, rng_key, net_input, batch['s'], is_training=False)
       res = res + gaussian_score
     else:
-      res, state = model.apply(params, state, rng_key, batch['y'], batch['s'], is_training=True)
-    loss = jnp.mean((batch['u'] + batch['s'] * res)**2)
+      res, state = model.apply(params, state, rng_key, batch['y'], batch['s'], is_training=False)
+      gaussian_score = jnp.zeros_like(res)
+    return batch, res, gaussian_score
+
+  # Training loss
+  def loss_fn(params, state, rng_key, batch):
+     _, res, gaussian_score = score_fn(params, state, rng_key, batch)
+    loss = jnp.mean((batch['u'] + batch['s'] * res + jnp.abs(batch['s']) * gaussian_score)**2)
     return loss, state
 
   @jax.jit
@@ -143,18 +149,6 @@ def main(_):
     else:
       new_sn_state = sn_state
     return loss, new_params, state, new_sn_state, new_opt_state
-
-  @jax.jit
-  def score_fn(params, state, rng_key, batch):
-    if FLAGS.gaussian_prior:
-      # If requested, first compute the Gaussian prior
-      gaussian_score = gaussian_prior_score(batch['y'], batch['s'], power_map)
-      net_input = jnp.concatenate([batch['y'], 0.1 * batch['s'] * gaussian_score],axis=-1)
-      res, state = model.apply(params, state, rng_key, batch['y'], batch['s'], is_training=False)
-      res = res + gaussian_score
-    else:
-      res, state = model.apply(params, state, rng_key, batch['y'], batch['s'], is_training=False)
-    return batch, res
 
   # Load dataset
   train = load_dataset(FLAGS.batch_size, FLAGS.noise_dist_std, FLAGS.train_split)
@@ -170,11 +164,12 @@ def main(_):
     if step%100==0:
       print(step, loss)
       # Running denoiser on a batch of images
-      batch, res = score_fn(params, state, next(rng_seq), next(train))
+      batch, res, gs = score_fn(params, state, next(rng_seq), next(train))
       summary_writer.image('score/target', batch['x'][0], step)
       summary_writer.image('score/input', batch['y'][0], step)
       summary_writer.image('score/score', res[0], step)
       summary_writer.image('score/denoised', batch['y'][0] + batch['s'][0,:,:,0]**2 * res[0], step)
+      summary_writer.image('score/gaussian_denoised', batch['y'][0] + batch['s'][0,:,:,0]**2 * gs[0], step)
 
     if step%5000 ==0:
       with open(FLAGS.output_dir+'/model-%d.pckl'%step, 'wb') as file:
