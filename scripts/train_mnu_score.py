@@ -171,7 +171,7 @@ def main(_):
       summary_writer.image('score/input', np.clip(batch['y'][0], 0, 0.1)*10., step)
       summary_writer.image('score/score', res[0]+gs[0], step)
       summary_writer.image('score/denoised', np.clip(batch['y'][0] + batch['s'][0,:,:,0]**2 * (res[0]+gs[0]), 0, 0.1)*10., step)
-      summary_writer.image('score/gaussian_denoised', np.clip(batch['y'][0] + batch['s'][0,:,:,0]**2 * gs[0]), 0, 0.1)*10., step)
+      summary_writer.image('score/gaussian_denoised', np.clip(batch['y'][0] + batch['s'][0,:,:,0]**2 * gs[0], 0, 0.1)*10., step)
 
     if step%5000 ==0:
       with open(FLAGS.output_dir+'/model-%d.pckl'%step, 'wb') as file:
