@@ -24,7 +24,7 @@ from jax_lensing.models.normalization import SNParamsTree as CustomSNParamsTree
 from jax_lensing.spectral import make_power_map
 
 flags.DEFINE_string("output_dir", ".", "Folder where to store model.")
-flags.DEFINE_integer("batch_size", 32, "Size of the batch to train on.")
+flags.DEFINE_integer("batch_size", 16, "Size of the batch to train on.")
 flags.DEFINE_float("learning_rate", 0.001, "Learning rate for the optimizer.")
 flags.DEFINE_integer("training_steps", 45000, "Number of training steps to run.")
 flags.DEFINE_string("train_split", "90%", "How much of the training set to use.")
@@ -48,7 +48,7 @@ def load_dataset(batch_size, noise_dist_std, train_split):
     # Sample random Gaussian noise
     u = tf.random.normal(tf.shape(x))
     # Sample standard deviation of noise corruption
-    s = noise_dist_std * tf.random.normal((tf.shape(x)[0], 1, 1, 1))
+    s = noise_dist_std * tf.random.normal((1, 1, 1))
     # Create noisy image
     y = x + s * u
     return {'x':x, 'y':y, 'u':u,'s':s}
@@ -57,7 +57,7 @@ def load_dataset(batch_size, noise_dist_std, train_split):
   ds = ds.repeat()
   ds = ds.map(pre_process)
   ds = ds.batch(batch_size)
-  ds = ds.prefetch(buffer_size=5)
+  ds = ds.prefetch(tf.data.experimental.AUTOTUNE)
   return iter(tfds.as_numpy(ds))
 
 def forward_fn(x, s, is_training=False):
@@ -69,7 +69,7 @@ def forward_fn(x, s, is_training=False):
 
 def log_gaussian_prior(map_data, sigma, ps_map):
   data_ft = jnp.fft.fft2(map_data) / 320.
-  return -0.5*jnp.sum(jnp.real(data_ft*jnp.conj(data_ft)) / (ps_map+ sigma**2))
+  return -0.5*jnp.sum(jnp.real(data_ft*jnp.conj(data_ft)) / (ps_map+sigma[0]**2))
 gaussian_prior_score = jax.vmap(jax.grad(log_gaussian_prior), in_axes=[0,0, None])
 
 def lr_schedule(step):
@@ -77,7 +77,7 @@ def lr_schedule(step):
   steps_per_epoch = 30000 // FLAGS.batch_size
 
   current_epoch = step / steps_per_epoch  # type: float
-  lr = (1.0 * FLAGS.batch_size) / 64
+  lr = (1.0 * FLAGS.batch_size) / 16
   boundaries = jnp.array((20, 40, 60)) * steps_per_epoch
   values = jnp.array([1., 0.1, 0.01, 0.001]) * lr
 
@@ -113,7 +113,7 @@ def main(_):
 
   # If the Gaussian prior is used, load the theoretical power spectrum
   if FLAGS.gaussian_prior:
-    ps_data = onp.load(FLAGS.gaussian_path)
+    ps_data = onp.load(FLAGS.gaussian_path).astype('float32')
     ell = jnp.array(ps_data[0,:])
     ps_halofit = jnp.array(ps_data[4,:] / 0.000116355**2) # normalisation by pixel size
     # convert to pixel units of our simple power spectrum calculator
@@ -125,7 +125,8 @@ def main(_):
   def score_fn(params, state, rng_key, batch):
     if FLAGS.gaussian_prior:
       # If requested, first compute the Gaussian prior
-      gaussian_score = gaussian_prior_score(batch['y'], batch['s'], power_map)
+      gaussian_score = gaussian_prior_score(batch['y'][...,0], batch['s'][...,0], power_map)
+      gaussian_score = jnp.expand_dims(gaussian_score, axis=-1)
       net_input = jnp.concatenate([batch['y'], jnp.abs(batch['s']) * gaussian_score],axis=-1)
       res, state = model.apply(params, state, rng_key, net_input, batch['s'], is_training=False)
     else:

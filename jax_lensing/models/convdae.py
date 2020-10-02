@@ -12,7 +12,7 @@ def check_length(length, value, name):
 
 def upsample(image):
     b, h, w, c = image.shape
-    upsampled_image = ji.resize(image, [b, 2*h, 2*w, c], 'bilinear')
+    upsampled_image = ji.resize(image, [b, 2*h, 2*w, c], 'nearest')
     return upsampled_image
 
 class BlockV1NoStride(hk.Module):
