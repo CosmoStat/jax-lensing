@@ -112,7 +112,7 @@ def main(_):
 
   # If the Gaussian prior is used, load the theoretical power spectrum
   if FLAGS.gaussian_prior:
-    ps_data = np.load(FLAGS.gaussian_path)
+    ps_data = onp.load(FLAGS.gaussian_path)
     ell = jnp.array(ps_data[0,:])
     ps_halofit = jnp.array(ps_data[4,:] / 0.000116355**2) # normalisation by pixel size
     # convert to pixel units of our simple power spectrum calculator
