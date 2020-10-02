@@ -24,7 +24,7 @@ from jax_lensing.spectral import make_power_map
 
 flags.DEFINE_string("output_dir", ".", "Folder where to store model.")
 flags.DEFINE_integer("batch_size", 16, "Size of the batch to train on.")
-flags.DEFINE_float("learning_rate", 0.0001, "Learning rate for the optimizer.")
+flags.DEFINE_float("learning_rate", 0.001, "Learning rate for the optimizer.")
 flags.DEFINE_integer("training_steps", 45000, "Number of training steps to run.")
 flags.DEFINE_string("train_split", "90%", "How much of the training set to use.")
 flags.DEFINE_float("noise_dist_std", 0.2, "Standard deviation of the noise distribution.")
@@ -126,7 +126,7 @@ def main(_):
       # If requested, first compute the Gaussian prior
       gaussian_score = gaussian_prior_score(batch['y'][...,0], batch['s'][...,0], power_map)
       gaussian_score = jnp.expand_dims(gaussian_score, axis=-1)
-      net_input = jnp.concatenate([batch['y'], 0.1*jnp.abs(batch['s']) * gaussian_score],axis=-1)
+      net_input = jnp.concatenate([batch['y'], jnp.abs(batch['s']) * gaussian_score],axis=-1)
       res, state = model.apply(params, state, rng_key, net_input, batch['s'], is_training=False)
     else:
       res, state = model.apply(params, state, rng_key, batch['y'], batch['s'], is_training=False)
