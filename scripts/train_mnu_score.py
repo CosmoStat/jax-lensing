@@ -128,7 +128,7 @@ def main(_):
       # If requested, first compute the Gaussian prior
       gaussian_score = gaussian_prior_score(batch['y'][...,0], batch['s'][...,0], power_map)
       gaussian_score = jnp.expand_dims(gaussian_score, axis=-1)
-      net_input = jnp.concatenate([batch['y'], jnp.abs(batch['s']) * gaussian_score],axis=-1)
+      net_input = jnp.concatenate([batch['y'], jnp.abs(batch['s'])**2 * gaussian_score],axis=-1)
       res, state = model.apply(params, state, rng_key, net_input, batch['s'], is_training=is_training)
     else:
       res, state = model.apply(params, state, rng_key, batch['y'], batch['s'], is_training=is_training)
@@ -169,8 +169,8 @@ def main(_):
       batch, res, gs = score_fn(params, state, next(rng_seq), next(train), is_training=False)
       summary_writer.image('score/target', batch['x'][0], step)
       summary_writer.image('score/input', batch['y'][0], step)
-      summary_writer.image('score/score', res[0], step)
-      summary_writer.image('score/denoised', batch['y'][0] + batch['s'][0,:,:,0]**2 * res[0], step)
+      summary_writer.image('score/score', res[0]+gs[0], step)
+      summary_writer.image('score/denoised', batch['y'][0] + batch['s'][0,:,:,0]**2 * (res[0]+gs[0]), step)
       summary_writer.image('score/gaussian_denoised', batch['y'][0] + batch['s'][0,:,:,0]**2 * gs[0], step)
 
     if step%5000 ==0:
