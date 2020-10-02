@@ -23,7 +23,7 @@ from jax_lensing.models.normalization import SNParamsTree as CustomSNParamsTree
 from jax_lensing.spectral import make_power_map
 
 flags.DEFINE_string("output_dir", ".", "Folder where to store model.")
-flags.DEFINE_integer("batch_size", 64, "Size of the batch to train on.")
+flags.DEFINE_integer("batch_size", 32, "Size of the batch to train on.")
 flags.DEFINE_float("learning_rate", 0.001, "Learning rate for the optimizer.")
 flags.DEFINE_integer("training_steps", 45000, "Number of training steps to run.")
 flags.DEFINE_string("train_split", "90%", "How much of the training set to use.")
@@ -135,7 +135,7 @@ def main(_):
 
   # Training loss
   def loss_fn(params, state, rng_key, batch):
-     _, res, gaussian_score = score_fn(params, state, rng_key, batch)
+    _, res, gaussian_score = score_fn(params, state, rng_key, batch)
     loss = jnp.mean((batch['u'] + batch['s'] * res + jnp.abs(batch['s']) * gaussian_score)**2)
     return loss, state
 
