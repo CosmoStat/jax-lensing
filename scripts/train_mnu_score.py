@@ -138,7 +138,7 @@ def main(_):
   # Training loss
   def loss_fn(params, state, rng_key, batch):
     _, res, gaussian_score = score_fn(params, state, rng_key, batch)
-    loss = jnp.mean((batch['u'] + batch['s'] * res + jnp.abs(batch['s']) * gaussian_score)**2)
+    loss = jnp.mean((batch['u'] + batch['s'] * (res + gaussian_score)**2)
     return loss, state
 
   @jax.jit
@@ -167,11 +167,11 @@ def main(_):
       print(step, loss)
       # Running denoiser on a batch of images
       batch, res, gs = score_fn(params, state, next(rng_seq), next(train), is_training=False)
-      summary_writer.image('score/target', batch['x'][0], step)
-      summary_writer.image('score/input', batch['y'][0], step)
+      summary_writer.image('score/target', np.clip(batch['x'][0], 0, 0.1)*10., step)
+      summary_writer.image('score/input', np.clip(batch['y'][0], 0, 0.1)*10., step)
       summary_writer.image('score/score', res[0]+gs[0], step)
-      summary_writer.image('score/denoised', batch['y'][0] + batch['s'][0,:,:,0]**2 * (res[0]+gs[0]), step)
-      summary_writer.image('score/gaussian_denoised', batch['y'][0] + batch['s'][0,:,:,0]**2 * gs[0], step)
+      summary_writer.image('score/denoised', np.clip(batch['y'][0] + batch['s'][0,:,:,0]**2 * (res[0]+gs[0]), 0, 0.1)*10., step)
+      summary_writer.image('score/gaussian_denoised', np.clip(batch['y'][0] + batch['s'][0,:,:,0]**2 * gs[0]), 0, 0.1)*10., step)
 
     if step%5000 ==0:
       with open(FLAGS.output_dir+'/model-%d.pckl'%step, 'wb') as file:
