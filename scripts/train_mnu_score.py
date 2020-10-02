@@ -138,7 +138,7 @@ def main(_):
   # Training loss
   def loss_fn(params, state, rng_key, batch):
     _, res, gaussian_score = score_fn(params, state, rng_key, batch)
-    loss = jnp.mean((batch['u'] + batch['s'] * (res + gaussian_score)**2)
+    loss = jnp.mean((batch['u'] + batch['s'] * (res + gaussian_score)**2))
     return loss, state
 
   @jax.jit
