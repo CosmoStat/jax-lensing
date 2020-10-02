@@ -1,6 +1,8 @@
 # Script for training a denoiser on Massive Nu
 import os
 
+os.environ['XLA_FLAGS']='--xla_gpu_cuda_data_dir=/gpfslocalsys/cuda/10.0'
+
 from absl import app
 from absl import flags
 import haiku as hk
