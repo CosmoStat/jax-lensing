@@ -66,11 +66,10 @@ def forward_fn(x, s, is_training=False):
     raise NotImplementedError
   return denoiser(x, s, is_training=is_training)
 
-@partial(jax.vmap, in_axes=[0,0, None])
 def log_gaussian_prior(map_data, sigma, ps_map):
   data_ft = jnp.fft.fft2(map_data) / 320.
   return -0.5*jnp.sum(jnp.real(data_ft*jnp.conj(data_ft)) / (ps_map+ sigma**2))
-gaussian_prior_score = jax.grad(log_gaussian_prior)
+gaussian_prior_score = jax.vmap(jax.grad(log_gaussian_prior), in_axes=[0,0, None])
 
 def lr_schedule(step):
   """Linear scaling rule optimized for 90 epochs."""
