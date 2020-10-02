@@ -127,7 +127,6 @@ def main(_):
       gaussian_score = gaussian_prior_score(batch['y'], batch['s'], power_map)
       net_input = jnp.concatenate([batch['y'], jnp.abs(batch['s']) * gaussian_score],axis=-1)
       res, state = model.apply(params, state, rng_key, net_input, batch['s'], is_training=False)
-      res = res + gaussian_score
     else:
       res, state = model.apply(params, state, rng_key, batch['y'], batch['s'], is_training=False)
       gaussian_score = jnp.zeros_like(res)
