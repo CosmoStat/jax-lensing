@@ -18,7 +18,7 @@ import tensorflow.compat.v2 as tf
 tf.enable_v2_behavior()
 import tensorflow_datasets as tfds
 
-from jax_lensing.models.convdae import SmallUResNet, UResNet128
+from jax_lensing.models.convdae import SmallUResNet
 from jax_lensing.models.normalization import SNParamsTree as CustomSNParamsTree
 from jax_lensing.spectral import make_power_map
 
@@ -62,8 +62,6 @@ def load_dataset(batch_size, noise_dist_std, train_split):
 def forward_fn(x, s, is_training=False):
   if FLAGS.model == 'SmallUResNet':
     denoiser = SmallUResNet(n_output_channels=1, variant=FLAGS.variant)
-  elif FLAGS.model == 'UResNet128':
-    denoiser = UResNet128(n_output_channels=1, variant=FLAGS.variant)
   else:
     raise NotImplementedError
   return denoiser(x, s, is_training=is_training)
