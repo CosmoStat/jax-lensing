@@ -20,6 +20,7 @@ import tensorflow.compat.v2 as tf
 tf.enable_v2_behavior()
 import tensorflow_datasets as tfds
 
+from jax_lensing.datasets.massivenu import MassiveNu
 from jax_lensing.models.convdae import SmallUResNet
 from jax_lensing.models.normalization import SNParamsTree as CustomSNParamsTree
 from jax_lensing.spectral import make_power_map
