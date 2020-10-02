@@ -115,10 +115,10 @@ def main(_):
   # If the Gaussian prior is used, load the theoretical power spectrum
   if FLAGS.gaussian_prior:
     ps_data = np.load(FLAGS.gaussian_path)
-    ell = jnp.array(pst[0,:])
-    ps_halofit = jnp.array(pst[4,:] / 0.000116355**2) # normalisation by pixel size
+    ell = jnp.array(ps_data[0,:])
+    ps_halofit = jnp.array(ps_data[4,:] / 0.000116355**2) # normalisation by pixel size
     # convert to pixel units of our simple power spectrum calculator
-    kell = ell / (360/3.5/0.5)
+    kell = ell / (360/3.5/0.5) / 320
     # Interpolate the Power Spectrum in Fourier Space
     power_map = jnp.array(make_power_map(ps_halofit, 320, kps=kell))
 
