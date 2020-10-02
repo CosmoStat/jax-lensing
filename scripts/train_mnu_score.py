@@ -97,7 +97,7 @@ def main(_):
       optix.scale_by_schedule(lr_schedule)
   )
   rng_seq = hk.PRNGSequence(42)
-  if FLAGS.gaussian_score:
+  if FLAGS.gaussian_prior:
     last_dim=2
   else:
     last_dim=1
