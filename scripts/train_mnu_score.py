@@ -26,7 +26,7 @@ from jax_lensing.models.normalization import SNParamsTree as CustomSNParamsTree
 from jax_lensing.spectral import make_power_map
 
 flags.DEFINE_string("output_dir", ".", "Folder where to store model.")
-flags.DEFINE_integer("batch_size", 16, "Size of the batch to train on.")
+flags.DEFINE_integer("batch_size", 32, "Size of the batch to train on.")
 flags.DEFINE_float("learning_rate", 0.001, "Learning rate for the optimizer.")
 flags.DEFINE_integer("training_steps", 45000, "Number of training steps to run.")
 flags.DEFINE_string("train_split", "90%", "How much of the training set to use.")
@@ -79,7 +79,7 @@ def lr_schedule(step):
   steps_per_epoch = 30000 // FLAGS.batch_size
 
   current_epoch = step / steps_per_epoch  # type: float
-  lr = (1.0 * FLAGS.batch_size) / 16
+  lr = (1.0 * FLAGS.batch_size) / 32
   boundaries = jnp.array((20, 40, 60)) * steps_per_epoch
   values = jnp.array([1., 0.1, 0.01, 0.001]) * lr
 
@@ -123,16 +123,15 @@ def main(_):
     # Interpolate the Power Spectrum in Fourier Space
     power_map = jnp.array(make_power_map(ps_halofit, 320, kps=kell))
 
-  @jax.jit
-  def score_fn(params, state, rng_key, batch):
+  def score_fn(params, state, rng_key, batch, is_training=True):
     if FLAGS.gaussian_prior:
       # If requested, first compute the Gaussian prior
       gaussian_score = gaussian_prior_score(batch['y'][...,0], batch['s'][...,0], power_map)
       gaussian_score = jnp.expand_dims(gaussian_score, axis=-1)
       net_input = jnp.concatenate([batch['y'], jnp.abs(batch['s']) * gaussian_score],axis=-1)
-      res, state = model.apply(params, state, rng_key, net_input, batch['s'], is_training=False)
+      res, state = model.apply(params, state, rng_key, net_input, batch['s'], is_training=is_training)
     else:
-      res, state = model.apply(params, state, rng_key, batch['y'], batch['s'], is_training=False)
+      res, state = model.apply(params, state, rng_key, batch['y'], batch['s'], is_training=is_training)
       gaussian_score = jnp.zeros_like(res)
     return batch, res, gaussian_score
 
@@ -167,7 +166,7 @@ def main(_):
     if step%100==0:
       print(step, loss)
       # Running denoiser on a batch of images
-      batch, res, gs = score_fn(params, state, next(rng_seq), next(train))
+      batch, res, gs = score_fn(params, state, next(rng_seq), next(train), is_training=False)
       summary_writer.image('score/target', batch['x'][0], step)
       summary_writer.image('score/input', batch['y'][0], step)
       summary_writer.image('score/score', res[0], step)
