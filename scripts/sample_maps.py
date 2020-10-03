@@ -17,7 +17,6 @@ from astropy.io import fits
 import tensorflow.compat.v2 as tf
 tf.enable_v2_behavior()
 
-from jax_lensing.datasets.massivenu import MassiveNu
 from jax_lensing.models.convdae import SmallUResNet
 from jax_lensing.models.normalization import SNParamsTree as CustomSNParamsTree
 from jax_lensing.spectral import make_power_map
@@ -36,7 +35,7 @@ flags.DEFINE_string("variant", "EiffL", "Variant of model.")
 flags.DEFINE_string("model", "SmallUResNet", "Name of model.")
 flags.DEFINE_integer("batch_size", 32, "Size of batch to sample in parallel.")
 flags.DEFINE_float("initial_temperature", 0.15, "Initial temperature at which to start sampling.")
-flags.DEFINE_float("initial_step_size", 0.001, "Initial step size at which to perform sampling.")
+flags.DEFINE_float("initial_step_size", 0.01, "Initial step size at which to perform sampling.")
 flags.DEFINE_integer("minimum_steps_per_temp", 10, "Minimum number of steps for each temperature.")
 flags.DEFINE_integer("num_steps", 5000, "Total number of steps in the chains.")
 flags.DEFINE_string("gaussian_path", "data/massivenu/mnu0.0_Maps10_PS_theory.npy", "Path to Massive Nu power spectrum.")
@@ -110,7 +109,7 @@ def main(_):
 
   # Prepare the first guess convergence by adding noise in the holes and performing
   # a KS inversion
-  gamma_init = ((1. - mask)*jnp.repeat(jnp.expand_dims(gamma,0), FLAGS.batch_size) +
+  gamma_init = (jnp.repeat(jnp.expand_dims((1. - mask)*gamma,0), FLAGS.batch_size) +
                 jnp.expand_dims(mask*FLAGS.sigma_gamma,0)*onp.random.randn(FLAGS.batch_size, 320, 320, 2))
   kappa_init = jax.vmap(ks93)(gamma_init[...,0], gamma_init[...,1])
   # kappa_init should now have shape [bs,320,320,2] but we only care about kappa_e
