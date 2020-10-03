@@ -1,4 +1,4 @@
-# Script for training a denoiser on Massive Nu
+# Script for sampling constrained realisations
 import os
 # This line is for running on Jean Zay
 os.environ['XLA_FLAGS']='--xla_gpu_cuda_data_dir=/gpfslocalsys/cuda/10.0'
@@ -106,7 +106,7 @@ def main(_):
     ml_score, _ = residual_prior_score(net_input, sigma)
     # Compute likelihood score
     data_score = likelihood_score(x, sigma, gamma, mask)
-    return (data_score + gaussian_score + ml_score).reshape((-1,320*320))
+    return (data_score + gaussian_score + ml_score[...,0]).reshape((-1,320*320))
 
   # Prepare the first guess convergence by adding noise in the holes and performing
   # a KS inversion
@@ -152,10 +152,8 @@ def main(_):
   print('average acceptance rate', onp.mean(trace[0]))
   print('final max temperature', onp.max(trace[1][:,-1]))
   # TODO: apply final projection
-
   # Save the chain
   fits.writeto(FLAGS.output_file, samples)
-
 
 if __name__ == "__main__":
   app.run(main)
