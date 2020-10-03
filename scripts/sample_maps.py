@@ -38,6 +38,7 @@ flags.DEFINE_float("initial_temperature", 0.15, "Initial temperature at which to
 flags.DEFINE_float("initial_step_size", 0.01, "Initial step size at which to perform sampling.")
 flags.DEFINE_integer("min_steps_per_temp", 10, "Minimum number of steps for each temperature.")
 flags.DEFINE_integer("num_steps", 5000, "Total number of steps in the chains.")
+flags.DEFINE_integer("output_steps", 1, "How many steps to output.")
 flags.DEFINE_string("gaussian_path", "data/massivenu/mnu0.0_Maps10_PS_theory.npy", "Path to Massive Nu power spectrum.")
 flags.DEFINE_boolean("gaussian_only", False, "Only use Gaussian score if yes.")
 
@@ -105,7 +106,7 @@ def main(_):
       ml_score = 0
     else:
       # Use Neural network to compute residual prior score
-      net_input = jnp.stack([x, sigma**2 * gaussian_score], axis=-1)
+      net_input = jnp.stack([x, sigma.reshape([-1,1,1])**2 * gaussian_score], axis=-1)
       ml_score = residual_prior_score(net_input, sigma.reshape([-1,1,1,1]))[0][...,0]
     # Compute likelihood score
     data_score = likelihood_score(x, sigma, gamma, mask)
@@ -141,11 +142,11 @@ def main(_):
         num_delta_logp_steps=4)
 
   samples, trace = tfp.mcmc.sample_chain(
-          num_results=FLAGS.num_steps//100,
+          num_results=FLAGS.output_steps,
           current_state=kappa_init.reshape([FLAGS.batch_size,-1]),
           kernel=tmc,
           num_burnin_steps=0,
-          num_steps_between_results=100,
+          num_steps_between_results=FLAGS.num_steps//FLAGS.output_steps,
           trace_fn=lambda _, pkr: (pkr.pre_tempering_results.is_accepted,
                                    pkr.post_tempering_inverse_temperatures,
                                    pkr.tempering_log_accept_ratio),
