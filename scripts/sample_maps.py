@@ -1,7 +1,7 @@
 # Script for sampling constrained realisations
 import os
 # This line is for running on Jean Zay
-os.environ['XLA_FLAGS']='--xla_gpu_cuda_data_dir=/gpfslocalsys/cuda/10.0'
+#os.environ['XLA_FLAGS']='--xla_gpu_cuda_data_dir=/gpfslocalsys/cuda/10.0'
 
 from absl import app
 from absl import flags
@@ -36,7 +36,7 @@ flags.DEFINE_string("model", "SmallUResNet", "Name of model.")
 flags.DEFINE_integer("batch_size", 32, "Size of batch to sample in parallel.")
 flags.DEFINE_float("initial_temperature", 0.15, "Initial temperature at which to start sampling.")
 flags.DEFINE_float("initial_step_size", 0.01, "Initial step size at which to perform sampling.")
-flags.DEFINE_integer("minimum_steps_per_temp", 10, "Minimum number of steps for each temperature.")
+flags.DEFINE_integer("min_steps_per_temp", 10, "Minimum number of steps for each temperature.")
 flags.DEFINE_integer("num_steps", 5000, "Total number of steps in the chains.")
 flags.DEFINE_string("gaussian_path", "data/massivenu/mnu0.0_Maps10_PS_theory.npy", "Path to Massive Nu power spectrum.")
 flags.DEFINE_boolean("gaussian_only", False, "Only use Gaussian score if yes.")
@@ -54,7 +54,7 @@ def log_gaussian_prior(map_data, sigma, ps_map):
   """ Gaussian prior on the power spectrum of the map
   """
   data_ft = jnp.fft.fft2(map_data) / 320.
-  return -0.5*jnp.sum(jnp.real(data_ft*jnp.conj(data_ft)) / (ps_map+sigma[0]**2))
+  return -0.5*jnp.sum(jnp.real(data_ft*jnp.conj(data_ft)) / (ps_map+sigma**2))
 gaussian_prior_score = jax.vmap(jax.grad(log_gaussian_prior), in_axes=[0,0, None])
 
 def log_likelihood(x, sigma, meas_shear, mask):
@@ -75,9 +75,10 @@ def main(_):
                              jnp.zeros((1, 1, 1, 1)), is_training=True)
 
   # Load the weights of the neural network
-  with open(FLAGS.model_weights, 'rb') as file:
-    params, state, sn_state = pickle.load(file)
-  residual_prior_score = partial(model.apply, params, state, next(rng_seq), is_training=True)
+  if not FLAGS.gaussian_only:
+    with open(FLAGS.model_weights, 'rb') as file:
+      params, state, sn_state = pickle.load(file)
+    residual_prior_score = partial(model.apply, params, state, next(rng_seq), is_training=True)
 
   # Load prior power spectrum
   ps_data = onp.load(FLAGS.gaussian_path).astype('float32')
@@ -97,41 +98,43 @@ def main(_):
     """ Compute the total score, combining the following components:
         gaussian prior, ml prior, data likelihood
     """
+    x = x.reshape([FLAGS.batch_size, 320, 320])
     # Retrieve Gaussian score
-    gaussian_score = gaussian_prior_score(x, s, power_map)
-    # Use Neural network to compute residual prior score
-    gaussian_score = jnp.expand_dims(gaussian_score, axis=-1)
-    net_input = jnp.concatenate([x, sigma**2 * gaussian_score], axis=-1)
-    ml_score, _ = residual_prior_score(net_input, sigma)
+    gaussian_score = gaussian_prior_score(x, sigma, power_map)
+    if FLAGS.gaussian_only:
+      ml_score = 0
+    else:
+      # Use Neural network to compute residual prior score
+      net_input = jnp.stack([x, sigma**2 * gaussian_score], axis=-1)
+      ml_score = residual_prior_score(net_input, sigma.reshape([-1,1,1,1]))[0][...,0]
     # Compute likelihood score
     data_score = likelihood_score(x, sigma, gamma, mask)
-    return (data_score + gaussian_score + ml_score[...,0]).reshape((-1,320*320))
+    return (data_score + gaussian_score + ml_score).reshape((-1,320*320))
 
   # Prepare the first guess convergence by adding noise in the holes and performing
   # a KS inversion
-  gamma_init = (jnp.repeat(jnp.expand_dims((1. - mask)*gamma,0), FLAGS.batch_size) +
-                jnp.expand_dims(mask*FLAGS.sigma_gamma,0)*onp.random.randn(FLAGS.batch_size, 320, 320, 2))
-  kappa_init = jax.vmap(ks93)(gamma_init[...,0], gamma_init[...,1])
-  # kappa_init should now have shape [bs,320,320,2] but we only care about kappa_e
-  kappa_init = kappa_init[...,0] # So now it has shape [bs, 320, 320]
+  gamma_init = (jnp.repeat(jnp.expand_dims(mask*gamma,0), FLAGS.batch_size, axis=0) +
+                jnp.expand_dims((1. - mask)*FLAGS.sigma_gamma,0)*onp.random.randn(FLAGS.batch_size, 320, 320, 2))
+  kappa_init, _ = jax.vmap(ks93)(gamma_init[...,0], gamma_init[...,1])
+  # we only care about kappa_e
 
   # Adds further noise in the image if the initial temp is above sigma_gamma
   if FLAGS.initial_temperature > FLAGS.sigma_gamma:
     delta_tmp = onp.sqrt(FLAGS.initial_temperature**2 - FLAGS.sigma_gamma**2)
     kappa_init = kappa_init + delta_tmp*onp.random.randn(FLAGS.batch_size, 320,320)
-
+  print(kappa_init.shape)
   # And now we can sample
   def make_kernel_fn(target_log_prob_fn, target_score_fn, sigma):
     return ScoreHamiltonianMonteCarlo(
         target_log_prob_fn=target_log_prob_fn,
         target_score_fn=target_score_fn,
-        step_size=FLAGS.initial_step_size*(np.max(sigma)/FLAGS.initial_temperature)**0.5,
+        step_size=FLAGS.initial_step_size*(jnp.max(sigma)/FLAGS.initial_temperature)**0.5,
         num_leapfrog_steps=3,
         num_delta_logp_steps=4)
 
   tmc = TemperedMC(
         target_score_fn=total_score_fn,
-        inverse_temperatures=FLAGS.initial_temperature*np.ones([FLAGS.batch_size]),
+        inverse_temperatures=FLAGS.initial_temperature*jnp.ones([FLAGS.batch_size]),
         make_kernel_fn=make_kernel_fn,
         gamma=0.98,
         min_steps_per_temp=FLAGS.min_steps_per_temp,
@@ -139,7 +142,7 @@ def main(_):
 
   samples, trace = tfp.mcmc.sample_chain(
           num_results=FLAGS.num_steps//100,
-          current_state=kappa_init,
+          current_state=kappa_init.reshape([FLAGS.batch_size,-1]),
           kernel=tmc,
           num_burnin_steps=0,
           num_steps_between_results=100,
@@ -152,7 +155,7 @@ def main(_):
   print('final max temperature', onp.max(trace[1][:,-1]))
   # TODO: apply final projection
   # Save the chain
-  fits.writeto(FLAGS.output_file, samples)
+  fits.writeto(FLAGS.output_file, onp.array(samples),overwrite=True)
 
 if __name__ == "__main__":
   app.run(main)
