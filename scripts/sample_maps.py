@@ -41,7 +41,7 @@ flags.DEFINE_integer("num_steps", 5000, "Total number of steps in the chains.")
 flags.DEFINE_integer("output_steps", 1, "How many steps to output.")
 flags.DEFINE_string("gaussian_path", "data/massivenu/mnu0.0_Maps10_PS_theory.npy", "Path to Massive Nu power spectrum.")
 flags.DEFINE_boolean("gaussian_only", False, "Only use Gaussian score if yes.")
-flags.DEFINE_boolean("reduced_shear", True, "Apply reduced shear correction if yes.")
+flags.DEFINE_boolean("reduced_shear", False, "Apply reduced shear correction if yes.")
 
 FLAGS = flags.FLAGS
 
