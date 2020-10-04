@@ -40,6 +40,7 @@ flags.DEFINE_integer("minimum_steps_per_temp", 10, "Minimum number of steps for 
 flags.DEFINE_integer("num_steps", 5000, "Total number of steps in the chains.")
 flags.DEFINE_string("gaussian_path", "data/massivenu/mnu0.0_Maps10_PS_theory.npy", "Path to Massive Nu power spectrum.")
 flags.DEFINE_boolean("gaussian_only", False, "Only use Gaussian score if yes.")
+flags.DEFINE_boolean("reduced_shear", True, "Apply reduced shear correction if yes.")
 
 FLAGS = flags.FLAGS
 
@@ -63,6 +64,8 @@ def log_likelihood(x, sigma, meas_shear, mask):
   ke = x.reshape((320, 320))
   kb = jnp.zeros(ke.shape)
   model_shear = jnp.stack(ks93inv(ke, kb), axis=-1)
+  if FLAGS.reduced_shear:
+    model_shear = model_shear /( 1. - jnp.clip(jnp.expand_dims(ke,axis=-1), -1., 0.9))
   return - jnp.sum(mask*(model_shear - meas_shear)**2/((FLAGS.sigma_gamma)**2 + sigma**2) )/2.
 likelihood_score = jax.vmap(jax.grad(log_likelihood), in_axes=[0,0, None, None])
 
