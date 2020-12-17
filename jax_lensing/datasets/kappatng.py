@@ -1,5 +1,6 @@
 """kappatng dataset."""
 
+import os
 import numpy as np
 import tensorflow as tf
 import tensorflow_datasets as tfds
@@ -33,7 +34,7 @@ class Kappatng(tfds.core.GeneratorBasedBuilder):
         description=_DESCRIPTION,
         features=tfds.features.FeaturesDict({
             # These are the features of your dataset like images, labels ...
-            "maps": tfds.features.Tensor(shape=[1024,1024], dtype=tf.float32),
+            "map": tfds.features.Tensor(shape=[1024,1024], dtype=tf.float32),
 	}),
         # If there's a common (input, target) tuple from the
         # features, specify them here. They'll be used if
@@ -59,7 +60,7 @@ class Kappatng(tfds.core.GeneratorBasedBuilder):
         ),
     ]
 
-  def _generate_examples(self, path):
+  def _generate_examples(self, images_dir_path):
     """Yields examples."""
     # TODO(kappatng): Yields (key, example) tuples from the dataset
     #yield 'key', {}
