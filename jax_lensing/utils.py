@@ -19,7 +19,7 @@ def load_dataset(batch_size, noise_dist_std, train_split):
     # Create noisy image
     y = x + s * u
     return {'x':x, 'y':y, 'u':u,'s':s}
-  ds = tfds.load('kappa_tng', split='train[:{}]'.format(train_split), shuffle_files=True)
+  ds = tfds.load('kappatng', split='train[:{}]'.format(train_split), shuffle_files=True)
   ds = ds.shuffle(buffer_size=10*batch_size)
   ds = ds.repeat()
   ds = ds.map(pre_process)
