@@ -66,6 +66,6 @@ class Kappatng(tfds.core.GeneratorBasedBuilder):
     #yield 'key', {}
     for i, image_file in enumerate(os.listdir(images_dir_path)):
       with open(os.path.join(images_dir_path, image_file), mode="rb") as f:
-        im = np.load(f).astype("float32")
+        im = np.load(f).astype("float32")*1
         f.close()
       yield '%d'%i, {"map": im}
