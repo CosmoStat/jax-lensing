@@ -1,7 +1,7 @@
 # Script for training a denoiser on Massive Nu
 import os
 
-os.environ['XLA_FLAGS']='--xla_gpu_cuda_data_dir=/gpfslocalsys/cuda/10.0'
+os.environ['XLA_FLAGS']='--xla_gpu_cuda_data_dir=/gpfslocalsys/cuda/10.1'
 
 from absl import app
 from absl import flags
@@ -21,10 +21,13 @@ tf.enable_v2_behavior()
 import tensorflow_datasets as tfds
 
 from jax_lensing.datasets.massivenu import MassiveNu
+from jax_lensing.datasets.kappatng import KappaTNG
 from jax_lensing.models.convdae import SmallUResNet
 from jax_lensing.models.normalization import SNParamsTree as CustomSNParamsTree
 from jax_lensing.spectral import make_power_map
+from jax_lensing.utils import load_dataset
 
+flags.DEFINE_string("dataset", "kappatng", "Suite of simulations to learn from")
 flags.DEFINE_string("output_dir", ".", "Folder where to store model.")
 flags.DEFINE_integer("batch_size", 32, "Size of the batch to train on.")
 flags.DEFINE_float("learning_rate", 0.001, "Learning rate for the optimizer.")
@@ -39,28 +42,6 @@ flags.DEFINE_string("model", "SmallUResNet", "Name of model.")
 
 FLAGS = flags.FLAGS
 
-def load_dataset(batch_size, noise_dist_std, train_split):
-  def pre_process(im):
-    """ Pre-processing function preparing data for denoising task
-    """
-    # Cutout a portion of the map
-    x = tf.image.random_crop(tf.expand_dims(im['map'],-1), [320,320,1])
-    x = tf.image.random_flip_left_right(x)
-    x = tf.image.random_flip_up_down(x)
-    # Sample random Gaussian noise
-    u = tf.random.normal(tf.shape(x))
-    # Sample standard deviation of noise corruption
-    s = noise_dist_std * tf.random.normal((1, 1, 1))
-    # Create noisy image
-    y = x + s * u
-    return {'x':x, 'y':y, 'u':u,'s':s}
-  ds = tfds.load('massive_nu', split='train[:%s]'%train_split, shuffle_files=True)
-  ds = ds.shuffle(buffer_size=10*batch_size)
-  ds = ds.repeat()
-  ds = ds.map(pre_process)
-  ds = ds.batch(batch_size)
-  ds = ds.prefetch(tf.data.experimental.AUTOTUNE)
-  return iter(tfds.as_numpy(ds))
 
 def forward_fn(x, s, is_training=False):
   if FLAGS.model == 'SmallUResNet':
@@ -153,7 +134,12 @@ def main(_):
     return loss, new_params, state, new_sn_state, new_opt_state
 
   # Load dataset
-  train = load_dataset(FLAGS.batch_size, FLAGS.noise_dist_std, FLAGS.train_split)
+  if FLAGS.dataset=="kappatng":
+    crop_width = 512
+  elif FLAGS.dataset=="massivenu":
+    crop_width = 320
+
+  train = load_dataset(FLAGS.dataset, FLAGS.batch_size, crop_width, FLAGS.noise_dist_std, FLAGS.train_split)
 
   summary_writer = tensorboard.SummaryWriter(FLAGS.output_dir)
 
