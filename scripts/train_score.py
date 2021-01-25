@@ -7,7 +7,7 @@ from absl import app
 from absl import flags
 import haiku as hk
 import jax
-from jax.experimental import optix
+import optax
 import jax.numpy as jnp
 import numpy as onp
 import pickle
@@ -79,9 +79,9 @@ def main(_):
                                                               val=FLAGS.spectral_norm)(x))
 
   # Initialisation
-  optimizer = optix.chain(
-      optix.adam(learning_rate=FLAGS.learning_rate),
-      optix.scale_by_schedule(lr_schedule)
+  optimizer = optax.chain(
+      optax.scale_by_adam(learning_rate=FLAGS.learning_rate),
+      optax.scale_by_schedule(lr_schedule)
   )
   rng_seq = hk.PRNGSequence(42)
   if FLAGS.gaussian_prior:
@@ -131,7 +131,7 @@ def main(_):
   def update(params, state, sn_state, rng_key, opt_state, batch):
     (loss, state), grads = jax.value_and_grad(loss_fn, has_aux=True)(params, state, rng_key, batch)
     updates, new_opt_state = optimizer.update(grads, opt_state)
-    new_params = optix.apply_updates(params, updates)
+    new_params = optax.apply_updates(params, updates)
     if FLAGS.spectral_norm > 0:
       new_params, new_sn_state = sn_fn.apply(None, sn_state, None, new_params)
     else:
