@@ -36,7 +36,7 @@ flags.DEFINE_string("train_split", "90%", "How much of the training set to use."
 flags.DEFINE_float("noise_dist_std", 0.2, "Standard deviation of the noise distribution.")
 flags.DEFINE_float("spectral_norm", 1., "Amount of spectral normalization.")
 flags.DEFINE_boolean("gaussian_prior", True, "Whether to train including Gaussian prior information.")
-flags.DEFINE_string("gaussian_path", "data/massivenu/mnu0.0_Maps10_PS_theory.npy", "Path to Massive Nu power spectrum.")
+flags.DEFINE_string("gaussian_path", "data/ktng/ktng_PS_theory.npy", "Path to Massive Nu power spectrum.")
 flags.DEFINE_string("variant", "EiffL", "Variant of model.")
 flags.DEFINE_string("model", "SmallUResNet", "Name of model.")
 flags.DEFINE_float("map_size", 512, "Size of maps after cropping")
@@ -103,7 +103,7 @@ def main(_):
     ps_data = onp.load(FLAGS.gaussian_path).astype('float32')
     ell = jnp.array(ps_data[0,:])
     # massivenu: channel 4
-    ps_halofit = jnp.array(ps_data[4,:] / pixel_size**2) # normalisation by pixel size
+    ps_halofit = jnp.array(ps_data[1,:] / pixel_size**2) # normalisation by pixel size
     # convert to pixel units of our simple power spectrum calculator
     kell = ell / (360/3.5/0.5) / FLAGS.map_size
     # Interpolate the Power Spectrum in Fourier Space
