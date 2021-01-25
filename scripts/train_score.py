@@ -39,6 +39,9 @@ flags.DEFINE_boolean("gaussian_prior", True, "Whether to train including Gaussia
 flags.DEFINE_string("gaussian_path", "data/massivenu/mnu0.0_Maps10_PS_theory.npy", "Path to Massive Nu power spectrum.")
 flags.DEFINE_string("variant", "EiffL", "Variant of model.")
 flags.DEFINE_string("model", "SmallUResNet", "Name of model.")
+flags.DEFINE_float("map_size", 512, "Size of maps after cropping")
+flags.DEFINE_float("resolution", 0.29, "Resolution in arcmin/pixel")
+
 
 FLAGS = flags.FLAGS
 
@@ -51,7 +54,7 @@ def forward_fn(x, s, is_training=False):
   return denoiser(x, s, is_training=is_training)
 
 def log_gaussian_prior(map_data, sigma, ps_map):
-  data_ft = jnp.fft.fft2(map_data) / 320.
+  data_ft = jnp.fft.fft2(map_data) / FLAGS.map_size
   return -0.5*jnp.sum(jnp.real(data_ft*jnp.conj(data_ft)) / (ps_map+sigma[0]**2))
 gaussian_prior_score = jax.vmap(jax.grad(log_gaussian_prior), in_axes=[0,0, None])
 
@@ -86,7 +89,7 @@ def main(_):
   else:
     last_dim=1
   params, state = model.init(next(rng_seq),
-                             jnp.zeros((1, 320, 320, last_dim)),
+                             jnp.zeros((1, FLAGS.map_size, FLAGS.map_size, last_dim)),
                              jnp.zeros((1, 1, 1, 1)), is_training=True)
   opt_state = optimizer.init(params)
   if FLAGS.spectral_norm > 0:
@@ -94,15 +97,17 @@ def main(_):
   else:
     sn_state = 0.
 
+  pixel_size = np.pi * FLAGS.resolution / 180. / 60. #rad/pixel
   # If the Gaussian prior is used, load the theoretical power spectrum
   if FLAGS.gaussian_prior:
     ps_data = onp.load(FLAGS.gaussian_path).astype('float32')
     ell = jnp.array(ps_data[0,:])
-    ps_halofit = jnp.array(ps_data[4,:] / 0.000116355**2) # normalisation by pixel size
+    # massivenu: channel 4
+    ps_halofit = jnp.array(ps_data[4,:] / pixel_size**2) # normalisation by pixel size
     # convert to pixel units of our simple power spectrum calculator
-    kell = ell / (360/3.5/0.5) / 320
+    kell = ell / (360/3.5/0.5) / FLAGS.map_size
     # Interpolate the Power Spectrum in Fourier Space
-    power_map = jnp.array(make_power_map(ps_halofit, 320, kps=kell))
+    power_map = jnp.array(make_power_map(ps_halofit, FLAGS.map_size, kps=kell))
 
   def score_fn(params, state, rng_key, batch, is_training=True):
     if FLAGS.gaussian_prior:
@@ -133,13 +138,7 @@ def main(_):
       new_sn_state = sn_state
     return loss, new_params, state, new_sn_state, new_opt_state
 
-  # Load dataset
-  if FLAGS.dataset=="kappatng":
-    crop_width = 512
-  elif FLAGS.dataset=="massivenu":
-    crop_width = 320
-
-  train = load_dataset(FLAGS.dataset, FLAGS.batch_size, crop_width, FLAGS.noise_dist_std, FLAGS.train_split)
+  train = load_dataset(FLAGS.dataset, FLAGS.batch_size, FLAGS.map_size, FLAGS.noise_dist_std, FLAGS.train_split)
 
   summary_writer = tensorboard.SummaryWriter(FLAGS.output_dir)
 
