@@ -302,6 +302,7 @@ class UResNet(hk.Module):
     out = inputs
     if self.pad_crop:
         out, padding = pad_for_pool(inputs, 4)
+    
     out = jnp.concatenate([out, condition*jnp.ones_like(out)[...,[0]]], axis=-1)
     out = self.initial_conv(out)
     if self.variant == "Zacc":
@@ -311,9 +312,8 @@ class UResNet(hk.Module):
     for block_group in self.block_groups:
       levels.append(out)
       out = block_group(out, is_training, test_local_stats)
-
     out = jnp.concatenate([out, condition*jnp.ones_like(out)],axis=-1)
-
+    
     # Increasing resolution
     for i, block_group in enumerate(self.up_block_groups[::-1]):
       out = block_group(out, is_training, test_local_stats)
@@ -365,7 +365,8 @@ class SmallUResNet(UResNet):
                      channels_per_group=(32, 64, 128, 128),
                      use_projection=(True, True, True, True),
                      # 320 -> 160 -> 80 -> 40
-                     strides=(2, 2, 2, 2),
+                     # 360 -> 180 -> 90 -> 45
+                     strides=(2, 2, 2, 1),
                      use_bn=use_bn,
                      pad_crop=pad_crop,
                      n_output_channels=n_output_channels,
