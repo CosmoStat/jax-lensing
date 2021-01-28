@@ -1,7 +1,7 @@
-# Script for training a denoiser on Massive Nu
+# Script for training a denoiser
 import os
 
-os.environ['XLA_FLAGS']='--xla_gpu_cuda_data_dir=/gpfslocalsys/cuda/10.1'
+os.environ['XLA_FLAGS']='--xla_gpu_cuda_data_dir=/gpfslocalsys/cuda/10.1.2'
 
 from absl import app
 from absl import flags
@@ -20,8 +20,6 @@ import tensorflow.compat.v2 as tf
 tf.enable_v2_behavior()
 import tensorflow_datasets as tfds
 
-from jax_lensing.datasets.massivenu import MassiveNu
-from jax_lensing.datasets.kappatng import KappaTNG
 from jax_lensing.models.convdae import SmallUResNet
 from jax_lensing.models.normalization import SNParamsTree as CustomSNParamsTree
 from jax_lensing.spectral import make_power_map
@@ -29,7 +27,7 @@ from jax_lensing.utils import load_dataset
 
 flags.DEFINE_string("dataset", "kappatng", "Suite of simulations to learn from")
 flags.DEFINE_string("output_dir", ".", "Folder where to store model.")
-flags.DEFINE_integer("batch_size", 32, "Size of the batch to train on.")
+flags.DEFINE_integer("batch_size", 28, "Size of the batch to train on.")
 flags.DEFINE_float("learning_rate", 0.001, "Learning rate for the optimizer.")
 flags.DEFINE_integer("training_steps", 45000, "Number of training steps to run.")
 flags.DEFINE_string("train_split", "90%", "How much of the training set to use.")
@@ -39,7 +37,7 @@ flags.DEFINE_boolean("gaussian_prior", True, "Whether to train including Gaussia
 flags.DEFINE_string("gaussian_path", "data/ktng/ktng_PS_theory.npy", "Path to Massive Nu power spectrum.")
 flags.DEFINE_string("variant", "EiffL", "Variant of model.")
 flags.DEFINE_string("model", "SmallUResNet", "Name of model.")
-flags.DEFINE_float("map_size", 512, "Size of maps after cropping")
+flags.DEFINE_integer("map_size", 360, "Size of maps after cropping")
 flags.DEFINE_float("resolution", 0.29, "Resolution in arcmin/pixel")
 
 
@@ -54,7 +52,7 @@ def forward_fn(x, s, is_training=False):
   return denoiser(x, s, is_training=is_training)
 
 def log_gaussian_prior(map_data, sigma, ps_map):
-  data_ft = jnp.fft.fft2(map_data) / FLAGS.map_size
+  data_ft = jnp.fft.fft2(map_data) / float(FLAGS.map_size)
   return -0.5*jnp.sum(jnp.real(data_ft*jnp.conj(data_ft)) / (ps_map+sigma[0]**2))
 gaussian_prior_score = jax.vmap(jax.grad(log_gaussian_prior), in_axes=[0,0, None])
 
@@ -80,7 +78,7 @@ def main(_):
 
   # Initialisation
   optimizer = optax.chain(
-      optax.scale_by_adam(learning_rate=FLAGS.learning_rate),
+      optax.adam(learning_rate=FLAGS.learning_rate),
       optax.scale_by_schedule(lr_schedule)
   )
   rng_seq = hk.PRNGSequence(42)
@@ -97,7 +95,7 @@ def main(_):
   else:
     sn_state = 0.
 
-  pixel_size = np.pi * FLAGS.resolution / 180. / 60. #rad/pixel
+  pixel_size = jnp.pi * FLAGS.resolution / 180. / 60. #rad/pixel
   # If the Gaussian prior is used, load the theoretical power spectrum
   if FLAGS.gaussian_prior:
     ps_data = onp.load(FLAGS.gaussian_path).astype('float32')
@@ -105,7 +103,7 @@ def main(_):
     # massivenu: channel 4
     ps_halofit = jnp.array(ps_data[1,:] / pixel_size**2) # normalisation by pixel size
     # convert to pixel units of our simple power spectrum calculator
-    kell = ell / (360/3.5/0.5) / FLAGS.map_size
+    kell = ell / (360/3.5/0.5) / float(FLAGS.map_size)
     # Interpolate the Power Spectrum in Fourier Space
     power_map = jnp.array(make_power_map(ps_halofit, FLAGS.map_size, kps=kell))
 
@@ -142,14 +140,14 @@ def main(_):
 
   summary_writer = tensorboard.SummaryWriter(FLAGS.output_dir)
 
+  print('training begins')
   for step in range(FLAGS.training_steps):
     loss, params, state, sn_state, opt_state = update(params, state, sn_state,
                                                       next(rng_seq), opt_state,
                                                       next(train))
 
     summary_writer.scalar('train_loss', loss, step)
-    if step%100==0:
-      print(step, loss)
+    if step%500==0:
       # Running denoiser on a batch of images
       batch, res, gs = score_fn(params, state, next(rng_seq), next(train), is_training=False)
       summary_writer.image('score/target', onp.clip(batch['x'][0], 0, 0.1)*10., step)
@@ -157,7 +155,8 @@ def main(_):
       summary_writer.image('score/score', res[0]+gs[0], step)
       summary_writer.image('score/denoised', onp.clip(batch['y'][0] + batch['s'][0,:,:,0]**2 * (res[0]+gs[0]), 0, 0.1)*10., step)
       summary_writer.image('score/gaussian_denoised', onp.clip(batch['y'][0] + batch['s'][0,:,:,0]**2 * gs[0], 0, 0.1)*10., step)
-
+      print(step)
+  
     if step%5000 ==0:
       with open(FLAGS.output_dir+'/model-%d.pckl'%step, 'wb') as file:
         pickle.dump([params, state, sn_state], file)
