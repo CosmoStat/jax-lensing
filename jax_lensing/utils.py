@@ -1,6 +1,7 @@
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
+import jax
 import jax.numpy as jnp
 
 def load_dataset(name, batch_size, crop_width, noise_dist_std, train_split):
@@ -26,3 +27,6 @@ def load_dataset(name, batch_size, crop_width, noise_dist_std, train_split):
   ds = ds.batch(batch_size)
   ds = ds.prefetch(tf.data.experimental.AUTOTUNE)
   return iter(tfds.as_numpy(ds))
+
+
+
