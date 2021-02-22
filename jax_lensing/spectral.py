@@ -17,15 +17,22 @@ def radial_profile(data):
   radialprofile = tbin / nr
   return radialprofile
 
-def measure_power_spectrum(map_data):
+def measure_power_spectrum(map_data, pixel_size):
   """
   measures power 2d data
-  :param power: map
+  :param power: map (nxn)
+  :param pixel_size: pixel_size (rad/pixel)
+  :return: ell
   :return: power spectrum
+  
   """
   data_ft = jnp.fft.fftshift(jnp.fft.fft2(map_data)) / map_data.shape[0]
   nyquist = np.int(map_data.shape[0]/2)
-  return radial_profile(jnp.real(data_ft*jnp.conj(data_ft)))[:nyquist]
+  power_spectrum_1d =  radial_profile(jnp.real(data_ft*jnp.conj(data_ft)))[:nyquist] * (pixel_size)**2
+  k = np.arange(power_spectrum_1d.shape[0])
+  ell = 2. * np.pi * k / pixel_size / 360
+  return ell, power_spectrum_1d
+
 
 def make_power_map(power_spectrum, size, kps=None, zero_freq_val=1e7):
   #Ok we need to make a map of the power spectrum in Fourier space
