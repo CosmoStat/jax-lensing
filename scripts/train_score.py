@@ -5,10 +5,12 @@ os.environ['XLA_FLAGS']='--xla_gpu_cuda_data_dir=/gpfslocalsys/cuda/10.1.2'
 
 from absl import app
 from absl import flags
+
 import haiku as hk
 import jax
-import optax
 import jax.numpy as jnp
+from jax.experimental import optix
+
 import numpy as onp
 import pickle
 from functools import partial
@@ -20,23 +22,23 @@ import tensorflow.compat.v2 as tf
 tf.enable_v2_behavior()
 import tensorflow_datasets as tfds
 
-from jax_lensing.models.convdae import SmallUResNet
+from jax_lensing.models.convdae2 import SmallUResNet, MediumUResNet
 from jax_lensing.models.normalization import SNParamsTree as CustomSNParamsTree
 from jax_lensing.spectral import make_power_map
 from jax_lensing.utils import load_dataset
 
 flags.DEFINE_string("dataset", "kappatng", "Suite of simulations to learn from")
-flags.DEFINE_string("output_dir", ".", "Folder where to store model.")
-flags.DEFINE_integer("batch_size", 28, "Size of the batch to train on.")
-flags.DEFINE_float("learning_rate", 0.001, "Learning rate for the optimizer.")
+flags.DEFINE_string("output_dir", "./weights/gp-sn1v2", "Folder where to store model.")
+flags.DEFINE_integer("batch_size", 32, "Size of the batch to train on.")
+flags.DEFINE_float("learning_rate", 0.0001, "Learning rate for the optimizer.")
 flags.DEFINE_integer("training_steps", 45000, "Number of training steps to run.")
 flags.DEFINE_string("train_split", "90%", "How much of the training set to use.")
 flags.DEFINE_float("noise_dist_std", 0.2, "Standard deviation of the noise distribution.")
-flags.DEFINE_float("spectral_norm", 1., "Amount of spectral normalization.")
+flags.DEFINE_float("spectral_norm", 1, "Amount of spectral normalization.")
 flags.DEFINE_boolean("gaussian_prior", True, "Whether to train including Gaussian prior information.")
 flags.DEFINE_string("gaussian_path", "data/ktng/ktng_PS_theory.npy", "Path to Massive Nu power spectrum.")
 flags.DEFINE_string("variant", "EiffL", "Variant of model.")
-flags.DEFINE_string("model", "SmallUResNet", "Name of model.")
+flags.DEFINE_string("model", "MediumUResNet", "Name of model.")
 flags.DEFINE_integer("map_size", 360, "Size of maps after cropping")
 flags.DEFINE_float("resolution", 0.29, "Resolution in arcmin/pixel")
 
@@ -47,6 +49,8 @@ FLAGS = flags.FLAGS
 def forward_fn(x, s, is_training=False):
   if FLAGS.model == 'SmallUResNet':
     denoiser = SmallUResNet(n_output_channels=1, variant=FLAGS.variant)
+  elif FLAGS.model == 'MediumUResNet':
+    denoiser = MediumUResNet()
   else:
     raise NotImplementedError
   return denoiser(x, s, is_training=is_training)
@@ -77,26 +81,31 @@ def main(_):
                                                               val=FLAGS.spectral_norm)(x))
 
   # Initialisation
-  optimizer = optax.chain(
-      optax.adam(learning_rate=FLAGS.learning_rate),
-      optax.scale_by_schedule(lr_schedule)
+  optimizer = optix.chain(
+      optix.adam(learning_rate=FLAGS.learning_rate),
+      optix.scale_by_schedule(lr_schedule)
   )
+
   rng_seq = hk.PRNGSequence(42)
+
   if FLAGS.gaussian_prior:
     last_dim=2
   else:
     last_dim=1
+
   params, state = model.init(next(rng_seq),
                              jnp.zeros((1, FLAGS.map_size, FLAGS.map_size, last_dim)),
                              jnp.zeros((1, 1, 1, 1)), is_training=True)
+
   opt_state = optimizer.init(params)
+
   if FLAGS.spectral_norm > 0:
     _, sn_state = sn_fn.init(next(rng_seq), params)
   else:
     sn_state = 0.
 
-  pixel_size = jnp.pi * FLAGS.resolution / 180. / 60. #rad/pixel
   # If the Gaussian prior is used, load the theoretical power spectrum
+  pixel_size = jnp.pi * FLAGS.resolution / 180. / 60. #rad/pixel
   if FLAGS.gaussian_prior:
     ps_data = onp.load(FLAGS.gaussian_path).astype('float32')
     ell = jnp.array(ps_data[0,:])
@@ -129,7 +138,7 @@ def main(_):
   def update(params, state, sn_state, rng_key, opt_state, batch):
     (loss, state), grads = jax.value_and_grad(loss_fn, has_aux=True)(params, state, rng_key, batch)
     updates, new_opt_state = optimizer.update(grads, opt_state)
-    new_params = optax.apply_updates(params, updates)
+    new_params = optix.apply_updates(params, updates)
     if FLAGS.spectral_norm > 0:
       new_params, new_sn_state = sn_fn.apply(None, sn_state, None, new_params)
     else:
@@ -147,6 +156,10 @@ def main(_):
                                                       next(train))
 
     summary_writer.scalar('train_loss', loss, step)
+    
+    if step%100==0:
+        print(step, loss)
+
     if step%500==0:
       # Running denoiser on a batch of images
       batch, res, gs = score_fn(params, state, next(rng_seq), next(train), is_training=False)
