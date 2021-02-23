@@ -28,5 +28,24 @@ def load_dataset(name, batch_size, crop_width, noise_dist_std, train_split):
   ds = ds.prefetch(tf.data.experimental.AUTOTUNE)
   return iter(tfds.as_numpy(ds))
 
-
-
+def load_dataset_deepmass(name, batch_size, crop_width, train_split):
+  """
+  This is a simplified version of the previous function to load datasets, here
+  we only want retrieve the maps, the rest of the preprocessing needs some jax
+  functions.
+  """
+  def pre_process(im):
+    """ Pre-processing function preparing data for denoising task
+    """
+    # Cutout a portion of the map
+    x = tf.image.random_crop(tf.expand_dims(im['map'],-1), [crop_width,crop_width,1])
+    x = tf.image.random_flip_left_right(x)
+    x = tf.image.random_flip_up_down(x)
+    return {'x':x }
+  ds = tfds.load(name, split='train[:{}]'.format(train_split), shuffle_files=True)
+  ds = ds.shuffle(buffer_size=10*batch_size)
+  ds = ds.repeat()
+  ds = ds.map(pre_process)
+  ds = ds.batch(batch_size)
+  ds = ds.prefetch(tf.data.experimental.AUTOTUNE)
+  return iter(tfds.as_numpy(ds))
