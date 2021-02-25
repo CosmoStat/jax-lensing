@@ -34,12 +34,12 @@ flags.DEFINE_float("sigma_gamma", 0.15, "Standard deviation of shear.")
 flags.DEFINE_string("model_weights", "model-final.pckl", "Path to trained model weights.")
 flags.DEFINE_string("variant", "EiffL", "Variant of model.")
 flags.DEFINE_string("model", "SmallUResNet", "Name of model.")
-flags.DEFINE_integer("batch_size", 32, "Size of batch to sample in parallel.")
+flags.DEFINE_integer("batch_size", 5, "Size of batch to sample in parallel.")
 flags.DEFINE_float("initial_temperature", 0.15, "Initial temperature at which to start sampling.")
 flags.DEFINE_float("initial_step_size", 0.01, "Initial step size at which to perform sampling.")
 flags.DEFINE_integer("min_steps_per_temp", 10, "Minimum number of steps for each temperature.")
 flags.DEFINE_integer("num_steps", 5000, "Total number of steps in the chains.")
-flags.DEFINE_integer("output_steps", 1, "How many steps to output.")
+flags.DEFINE_integer("output_steps", 2, "How many steps to output.")
 flags.DEFINE_string("gaussian_path", "data/massivenu/mnu0.0_Maps10_PS_theory.npy", "Path to Massive Nu power spectrum.")
 flags.DEFINE_boolean("gaussian_only", False, "Only use Gaussian score if yes.")
 flags.DEFINE_boolean("reduced_shear", False, "Apply reduced shear correction if yes.")
@@ -96,7 +96,8 @@ def main(_):
   # 4th channel for massivenu
   ps_halofit = jnp.array(ps_data[1,:] / pixel_size**2) # normalisation by pixel size
   # convert to pixel units of our simple power spectrum calculator
-  kell = ell / (360/3.5/0.5) / float(FLAGS.map_size)
+  #kell = ell / (360/3.5/0.5) / float(FLAGS.map_size)
+  kell = ell /2/jnp.pi * 360 * pixel_size / FLAGS.map_size
   # Interpolate the Power Spectrum in Fourier Space
   power_map = jnp.array(make_power_map(ps_halofit, FLAGS.map_size, kps=kell))
 
