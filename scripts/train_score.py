@@ -28,7 +28,7 @@ from jax_lensing.spectral import make_power_map
 from jax_lensing.utils import load_dataset
 
 flags.DEFINE_string("dataset", "kappatng", "Suite of simulations to learn from")
-flags.DEFINE_string("output_dir", "./weights/gp-sn1v2", "Folder where to store model.")
+flags.DEFINE_string("output_dir", "./weights/gp-sn1v3", "Folder where to store model.")
 flags.DEFINE_integer("batch_size", 32, "Size of the batch to train on.")
 flags.DEFINE_float("learning_rate", 0.0001, "Learning rate for the optimizer.")
 flags.DEFINE_integer("training_steps", 45000, "Number of training steps to run.")
@@ -112,7 +112,8 @@ def main(_):
     # massivenu: channel 4
     ps_halofit = jnp.array(ps_data[1,:] / pixel_size**2) # normalisation by pixel size
     # convert to pixel units of our simple power spectrum calculator
-    kell = ell / (360/3.5/0.5) / float(FLAGS.map_size)
+    #kell = ell / (360/3.5/0.5) / float(FLAGS.map_size)
+    kell = ell /2/jnp.pi * 360 * pixel_size / FLAGS.map_size
     # Interpolate the Power Spectrum in Fourier Space
     power_map = jnp.array(make_power_map(ps_halofit, FLAGS.map_size, kps=kell))
 
