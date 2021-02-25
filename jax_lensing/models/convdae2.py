@@ -1,5 +1,4 @@
 import jax
-import jax.image as ji
 import jax.numpy as jnp
 import haiku as hk
 
@@ -10,12 +9,7 @@ def check_length(length, value, name):
   if len(value) != length:
     raise ValueError(f"`{name}` must be of length 4 not {len(value)}")
 
-def upsample(image):
-    b, h, w, c = image.shape
-    upsampled_image = ji.resize(image, [b, 2*h, 2*w, c], 'nearest')
-    return upsampled_image
-
-class BlockV1NoStride(hk.Module):
+class BlockV1(hk.Module):
   """ResNet V1 block with optional bottleneck."""
 
   def __init__(
@@ -25,76 +19,65 @@ class BlockV1NoStride(hk.Module):
       use_projection: bool,
       bn_config: Mapping[str, float],
       bottleneck: bool,
-      use_bn: bool = True,
       transpose: bool = False,
       name: Optional[str] = None
   ):
     super().__init__(name=name)
     self.use_projection = use_projection
-    self.use_bn = use_bn
-    if self.use_bn:
-        bn_config = dict(bn_config)
-        bn_config.setdefault("create_scale", True)
-        bn_config.setdefault("create_offset", True)
-        bn_config.setdefault("decay_rate", 0.999)
+
+    bn_config = dict(bn_config)
+    bn_config.setdefault("create_scale", True)
+    bn_config.setdefault("create_offset", True)
+    bn_config.setdefault("decay_rate", 0.999)
 
     if transpose:
-      self.pooling_or_upsampling = upsample
+      maybe_transposed_conv = hk.Conv2DTranspose
     else:
-      self.pooling_or_upsampling = hk.AvgPool(window_shape=2, strides=2, padding='SAME')
-    self.stride = stride
+      maybe_transposed_conv = hk.Conv2D
 
     if self.use_projection:
-      # this is just used for the skip connection
-      self.proj_conv = hk.Conv2D(
+      self.proj_conv = maybe_transposed_conv(
           output_channels=channels,
           kernel_shape=1,
-          # depending on whether it's transpose or not this stride must be
-          # replaced by upsampling or avg pooling
-          stride=1,
-          with_bias=not self.use_bn,
+          stride=stride,
+          with_bias=False,
           padding="SAME",
           name="shortcut_conv")
-      if self.use_bn:
-          self.proj_batchnorm = hk.BatchNorm(name="shortcut_batchnorm", **bn_config)
+
+      self.proj_batchnorm = hk.BatchNorm(name="shortcut_batchnorm", **bn_config)
 
     channel_div = 4 if bottleneck else 1
     conv_0 = hk.Conv2D(
         output_channels=channels // channel_div,
         kernel_shape=1 if bottleneck else 3,
         stride=1,
-        with_bias=not self.use_bn,
+        with_bias=False,
         padding="SAME",
         name="conv_0")
-    if self.use_bn:
-        bn_0 = hk.BatchNorm(name="batchnorm_0", **bn_config)
+    bn_0 = hk.BatchNorm(name="batchnorm_0", **bn_config)
 
-    conv_1 = hk.Conv2D(
+    conv_1 = maybe_transposed_conv(
         output_channels=channels // channel_div,
         kernel_shape=3,
-        stride=1,
-        with_bias=not self.use_bn,
+        stride=stride,
+        with_bias=False,
         padding="SAME",
         name="conv_1")
-    if self.use_bn:
-        bn_1 = hk.BatchNorm(name="batchnorm_1", **bn_config)
-        layers = ((conv_0, bn_0), (conv_1, bn_1))
-    else:
-        layers = ((conv_0, None), (conv_1, None))
+
+    bn_1 = hk.BatchNorm(name="batchnorm_1", **bn_config)
+    layers = ((conv_0, bn_0), (conv_1, bn_1))
 
     if bottleneck:
       conv_2 = hk.Conv2D(
           output_channels=channels,
           kernel_shape=1,
           stride=1,
-          with_bias=not self.use_bn,
+          with_bias=False,
           padding="SAME",
           name="conv_2")
-      if self.use_bn:
-          bn_2 = hk.BatchNorm(name="batchnorm_2", scale_init=jnp.zeros, **bn_config)
-          layers = layers + ((conv_2, bn_2),)
-      else:
-          layers = layers + ((conv_2, None),)
+
+      bn_2 = hk.BatchNorm(name="batchnorm_2", scale_init=jnp.zeros, **bn_config)
+      layers = layers + ((conv_2, bn_2),)
 
     self.layers = layers
 
@@ -102,18 +85,12 @@ class BlockV1NoStride(hk.Module):
     out = shortcut = inputs
 
     if self.use_projection:
-      if self.stride > 1:
-          shortcut = self.pooling_or_upsampling(shortcut)
       shortcut = self.proj_conv(shortcut)
-      if self.use_bn:
-          shortcut = self.proj_batchnorm(shortcut, is_training, test_local_stats)
+      shortcut = self.proj_batchnorm(shortcut, is_training, test_local_stats)
 
-    if self.stride > 1:
-        out = self.pooling_or_upsampling(out)
     for i, (conv_i, bn_i) in enumerate(self.layers):
       out = conv_i(out)
-      if self.use_bn:
-          out = bn_i(out, is_training, test_local_stats)
+      out = bn_i(out, is_training, test_local_stats)
       if i < len(self.layers) - 1:  # Don't apply relu on last layer
         out = jax.nn.relu(out)
 
@@ -131,12 +108,11 @@ class BlockGroup(hk.Module):
       bottleneck: bool,
       use_projection: bool,
       transpose: bool,
-      use_bn: bool = True,
       name: Optional[str] = None,
   ):
     super().__init__(name=name)
 
-    block_cls = BlockV1NoStride
+    block_cls = BlockV1
 
     self.blocks = []
     for i in range(num_blocks):
@@ -147,7 +123,6 @@ class BlockGroup(hk.Module):
                     bottleneck=bottleneck,
                     bn_config=bn_config,
                     transpose=transpose,
-                    use_bn=use_bn,
                     name="block_%d" % (i)))
 
   def __call__(self, inputs, is_training, test_local_stats):
@@ -156,23 +131,6 @@ class BlockGroup(hk.Module):
       out = block(out, is_training, test_local_stats)
     return out
 
-def pad_for_pool(x, n_downsampling):
-    problematic_dim = jnp.shape(x)[-2]
-    k = jnp.floor_divide(problematic_dim, 2 ** n_downsampling)
-    if problematic_dim % 2 ** n_downsampling == 0:
-        n_pad = 0
-    else:
-        n_pad = (k + 1) * 2 ** n_downsampling - problematic_dim
-    padding = (n_pad//2, n_pad//2)
-    paddings = [
-        (0, 0),
-        (0, 0),  # here in the context of fastMRI there is nothing to worry about because the dim is 640 (128 x 5)
-        # even for brain data, it shouldn't be a problem, since it's 640, 512, or 768.
-        padding,
-        (0, 0),
-    ]
-    inputs_padded = jnp.pad(x, paddings)
-    return inputs_padded, padding
 
 class UResNet(hk.Module):
   """ Implementation of a denoising auto-encoder based on a resnet architecture
@@ -184,11 +142,6 @@ class UResNet(hk.Module):
                bottleneck,
                channels_per_group,
                use_projection,
-               strides,
-               n_output_channels=1,
-               use_bn=True,
-               pad_crop=False,
-               variant='EiffL',
                name=None):
     """Constructs a Residual UNet model based on a traditional ResNet.
     Args:
@@ -205,49 +158,37 @@ class UResNet(hk.Module):
         of channels used for each block in each group.
       use_projection: A sequence of length 4 that indicates whether each
         residual block should use projection.
-      n_output_channels: The number of output channels, for example to change in
-        the case of a complex denoising. Defaults to 1.
-      use_bn: Whether the network should use batch normalisation. Defaults to
-        ``True``.
-      pad_crop: Whether to use cropping/padding to make sure the images can be
-        downsampled and upsampled correctly. Defaults to ``False``.
       name: Name of the module.
     """
     super().__init__(name=name)
     self.resnet_v2 = False
-    self.use_bn = use_bn
-    self.pad_crop = pad_crop
-    self.n_output_channels = n_output_channels
+
     bn_config = dict(bn_config or {})
     bn_config.setdefault("decay_rate", 0.9)
     bn_config.setdefault("eps", 1e-5)
     bn_config.setdefault("create_scale", True)
     bn_config.setdefault("create_offset", True)
-    self.variant = variant
-    self.strides = strides
-    bl = len(self.strides)
 
     # Number of blocks in each group for ResNet.
-    check_length(bl, blocks_per_group, "blocks_per_group")
-    check_length(bl, channels_per_group, "channels_per_group")
-    self.upsampling = upsample
-    self.pooling = hk.AvgPool(window_shape=2, strides=2, padding='SAME')
+    check_length(4, blocks_per_group, "blocks_per_group")
+    check_length(4, channels_per_group, "channels_per_group")
 
     self.initial_conv = hk.Conv2D(
         output_channels=32,
         kernel_shape=7,
-        stride=1,
-        with_bias=not self.use_bn,
+        stride=2,
+        with_bias=False,
         padding="SAME",
         name="initial_conv")
 
-    if not self.resnet_v2 and self.use_bn:
+    if not self.resnet_v2:
       self.initial_batchnorm = hk.BatchNorm(name="initial_batchnorm",
                                             **bn_config)
 
     self.block_groups = []
     self.up_block_groups = []
-    for i in range(bl):
+    strides = (1, 2, 2, 1)
+    for i in range(4):
       self.block_groups.append(
           BlockGroup(channels=channels_per_group[i],
                      num_blocks=blocks_per_group[i],
@@ -256,10 +197,9 @@ class UResNet(hk.Module):
                      bottleneck=bottleneck,
                      use_projection=use_projection[i],
                      transpose=False,
-                     use_bn=self.use_bn,
                      name="block_group_%d" % (i)))
 
-    for i in range(bl):
+    for i in range(4):
       self.up_block_groups.append(
           BlockGroup(channels=channels_per_group[i],
                      num_blocks=blocks_per_group[i],
@@ -268,84 +208,49 @@ class UResNet(hk.Module):
                      bottleneck=bottleneck,
                      use_projection=use_projection[i],
                      transpose=True,
-                     use_bn=self.use_bn,
                      name="up_block_group_%d" % (i)))
 
-    if self.resnet_v2 and self.use_bn:
+    if self.resnet_v2:
       self.final_batchnorm = hk.BatchNorm(name="final_batchnorm", **bn_config)
 
-    if self.variant == "Zacc":
-      self.final_up_conv = hk.Conv2D(
-          output_channels=channels_per_group[0]*self.n_output_channels//2,
-          kernel_shape=5,
-          stride=1,
-          padding="SAME",
-          name="final_up_conv",
-      )
-      self.antepenultian_conv = hk.Conv2D(
-          output_channels=channels_per_group[0]*self.n_output_channels//2,
-          kernel_shape=3,
-          stride=1,
-          padding='SAME',
-          name='antepenultian_conv',
-      )
-    self.final_conv = hk.Conv2D(
-        output_channels=self.n_output_channels,
-        kernel_shape=5,
-        stride=1,
-        padding='SAME',
-        name='final_conv',
-    )
+    self.final_upconv = hk.Conv2DTranspose(output_channels=1,
+                                kernel_shape=5,
+                                stride=2,
+                                padding="SAME",
+                                name="final_upconv")
 
+    self.final_conv = hk.Conv2DTranspose(output_channels=1,
+                                kernel_shape=5,
+                                stride=2,
+                                padding="SAME",
+                                name="final_conv")
 
   def __call__(self, inputs, condition, is_training, test_local_stats=False):
     out = inputs
-    if self.pad_crop:
-        out, padding = pad_for_pool(inputs, 4)
-    
     out = jnp.concatenate([out, condition*jnp.ones_like(out)[...,[0]]], axis=-1)
     out = self.initial_conv(out)
-    if self.variant == "Zacc":
-      out = self.pooling(out)
+
     # Decreasing resolution
     levels = []
     for block_group in self.block_groups:
       levels.append(out)
       out = block_group(out, is_training, test_local_stats)
+
     out = jnp.concatenate([out, condition*jnp.ones_like(out)],axis=-1)
-    
+
     # Increasing resolution
     for i, block_group in enumerate(self.up_block_groups[::-1]):
       out = block_group(out, is_training, test_local_stats)
       out = jnp.concatenate([out, levels[-i-1]],axis=-1)
 
     # Second to last upsampling, merging with input branch
-    if self.variant == "Zacc":
-      out = self.upsampling(out)
-      out = self.final_up_conv(out)
-      out = self.antepenultian_conv(out)
-      out = jax.nn.relu(out)
-
-    out = self.final_conv(out)
-    if self.pad_crop:
-        condition_normalisation = (jnp.abs(condition)*jnp.ones_like(pad_for_pool(inputs, 4)[0])+1e-3)
-    else:
-        condition_normalisation = (jnp.abs(condition)*jnp.ones_like(inputs)+1e-3)
-    out = out / condition_normalisation
-    if self.pad_crop:
-        if not jnp.sum(padding) == 0:
-            out = out[:, :, padding[0]:-padding[1]]
-    return out
+    return self.final_conv(out)/(jnp.abs(condition)*jnp.ones_like(inputs)+1e-3)
 
 class SmallUResNet(UResNet):
   """ResNet18."""
 
   def __init__(self,
                bn_config: Optional[Mapping[str, float]] = None,
-               use_bn: bool = True,
-               pad_crop: bool = False,
-               n_output_channels: int = 1,
-               variant: Optional[str] = 'EiffL',
                name: Optional[str] = None):
     """Constructs a ResNet model.
     Args:
@@ -353,10 +258,6 @@ class SmallUResNet(UResNet):
         passed on to the :class:`~haiku.BatchNorm` layers.
       resnet_v2: Whether to use the v1 or v2 ResNet implementation. Defaults
         to ``False``.
-      use_bn: Whether the network should use batch normalisation. Defaults to
-        ``True``.
-      n_output_channels: The number of output channels, for example to change in
-        the case of a complex denoising. Defaults to 1.
       name: Name of the module.
     """
     super().__init__(blocks_per_group=(2, 2, 2, 2),
@@ -364,10 +265,35 @@ class SmallUResNet(UResNet):
                      bottleneck=False,
                      channels_per_group=(32, 64, 128, 128),
                      use_projection=(True, True, True, True),
-                     # 320 -> 160 -> 80 -> 40
-                     strides=(2, 2, 2, 2),
-                     use_bn=use_bn,
-                     pad_crop=pad_crop,
-                     n_output_channels=n_output_channels,
-                     variant=variant,
                      name=name)
+
+
+class MediumUResNet(UResNet):
+  """ResNet18."""
+
+  def __init__(self,
+               bn_config: Optional[Mapping[str, float]] = None,
+               name: Optional[str] = None):
+    """Constructs a ResNet model.
+    Args:
+      bn_config: A dictionary of two elements, ``decay_rate`` and ``eps`` to be
+        passed on to the :class:`~haiku.BatchNorm` layers.
+      resnet_v2: Whether to use the v1 or v2 ResNet implementation. Defaults
+        to ``False``.
+      name: Name of the module.
+    """
+    super().__init__(blocks_per_group=(2, 2, 2, 2),
+                     bn_config=bn_config,
+                     bottleneck=False,
+                     channels_per_group=(32, 64, 128, 128),
+                     use_projection=(True, True, True, True),
+                     name=name)
+
+def forward(x, s, is_training=False):
+    denoiser = MediumUResNet()
+    return denoiser(x, s, is_training=is_training)
+
+model = hk.transform_with_state(forward)
+
+#sn_fn = hk.transform_with_state(lambda x: hk.SNParamsTree(ignore_regex='[^?!.]*b$')(x))
+#sn_fn = hk.transform_with_state(lambda x: CustomSNParamsTree(ignore_regex='[^?!.]*b$',val=2.)(x))
