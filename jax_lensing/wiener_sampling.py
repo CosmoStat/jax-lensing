@@ -40,6 +40,57 @@ def spin_wiener_filter(data_q, data_u, ncov_diag_Q,ncov_diag_U, input_ps_map_E, 
 
 
 
+
+
+def spin_wiener_sampler(data_q, data_u, ncov_diag_Q,ncov_diag_U, input_ps_map_E, input_ps_map_B, iterations=10, initial_map=None, thinning=1, verbose=False):
+    """
+    From Elsner & Wandelt '13 (messenger field paper) with spin addition
+
+    """
+    size = (data_q).shape[0]
+    tcov_diag = np.min(np.array([ncov_diag_Q, ncov_diag_U]))
+    tcov_ft = tcov_diag # unnecessary really, but convention dependent
+    scov_ft_E = np.fft.fftshift(input_ps_map_E)
+    scov_ft_B = np.fft.fftshift(input_ps_map_B)
+    sigma_t_squared_Q =  tcov_diag  - tcov_diag * tcov_diag / ncov_diag_Q
+    sigma_t_squared_U =  tcov_diag  - tcov_diag * tcov_diag / ncov_diag_U
+    sigma_s_squared_E =  scov_ft_E*tcov_ft/(tcov_ft+scov_ft_E)
+    sigma_s_squared_B =  scov_ft_B*tcov_ft/(tcov_ft+scov_ft_B)
+
+    if initial_map is None:
+        s = data_q + 1j*data_u
+    else:
+        s = np.copy(initial_map)
+
+    assert (iterations%thinning == 0)
+    
+    samples = np.zeros(shape=(int(iterations/thinning), size,size), dtype=np.complex128)
+    
+    for i in range(iterations):
+        # in Q, U representation
+        t_Q  = (tcov_diag/ncov_diag_Q)*data_q + ((ncov_diag_Q-tcov_diag)/ncov_diag_Q) * s[0]
+        t_U  = (tcov_diag/ncov_diag_U)*data_u + ((ncov_diag_U-tcov_diag)/ncov_diag_U) * s[1]
+        t_Q = np.random.normal(t_Q.real, np.sqrt(sigma_t_squared_Q))
+        t_U = np.random.normal(t_U.real, np.sqrt(sigma_t_squared_U))
+        # in E, B representation
+        t = ks93(t_Q,t_U)
+        s_E  = (scov_ft_E/(scov_ft_E+tcov_ft))*np.fft.fft2(t[0])
+        s_B  = (scov_ft_B/(scov_ft_B+tcov_ft))*np.fft.fft2(t[1])
+        s_E = np.random.normal(s_E.real*0., np.sqrt(sigma_s_squared_E)*size) + s_E
+        s_B = np.random.normal(s_B.real*0., np.sqrt(sigma_s_squared_B)*size) + s_B
+        s_E = np.fft.ifft2(s_E)
+        s_B = np.fft.ifft2(s_B)
+        # in Q, U representation
+        s = ks93(s_E,s_B)
+        if i%thinning==0:
+            samples[int(i/thinning)] = s[0] + 1j*s[1] 
+            if verbose==True:
+                print(i)
+    return samples
+
+
+
+
 # doesn't work :/
 @jit
 def spin_wiener_filter_jit(data_q, data_u, ncov_diag_Q,ncov_diag_U, input_ps_map_E, input_ps_map_B, iterations=10, verbose=False):
@@ -74,43 +125,3 @@ def spin_wiener_filter_jit(data_q, data_u, ncov_diag_Q,ncov_diag_U, input_ps_map
         s_q, s_u = ks93inv(s_E,s_B)
 
     return s_q,s_u
-
-
-
-def spin_wiener_sampler(data_input, ncov_diag_Q,ncov_diag_U, input_ps_map_E, input_ps_map_B, initial_map, iterations=10, thinning=1, verbose=False):
-    """
-    From Elsner & Wandelt '13 (messenger field paper) with spin addition
-    """
-    size = (data_input.real).shape[0]
-    tcov_diag = np.min(np.array([ncov_diag_Q, ncov_diag_U]))
-    tcov_ft = tcov_diag
-    scov_ft_E = np.fft.fftshift(input_ps_map_E)
-    scov_ft_B = np.fft.fftshift(input_ps_map_B)
-    sigma_t_squared_Q =  tcov_diag  - tcov_diag * tcov_diag / ncov_diag_Q
-    sigma_t_squared_U =  tcov_diag  - tcov_diag * tcov_diag / ncov_diag_U
-    sigma_s_squared_E =  scov_ft_E*tcov_ft/(tcov_ft+scov_ft_E)
-    sigma_s_squared_B =  scov_ft_B*tcov_ft/(tcov_ft+scov_ft_B)
-    s = np.copy(initial_map)
-    assert (iterations%thinning == 0)
-    samples = np.zeros(shape=(int(iterations/thinning), size,size), dtype=np.complex128)
-    for i in range(iterations):
-        # in Q, U representation
-        t_Q  = (tcov_diag/ncov_diag_Q)*data_input.real + ((ncov_diag_Q-tcov_diag)/ncov_diag_Q) * s.real
-        t_U  = (tcov_diag/ncov_diag_U)*data_input.imag + ((ncov_diag_U-tcov_diag)/ncov_diag_U) * s.imag
-        t_Q = np.random.normal(t_Q, np.sqrt(sigma_t_squared_Q))
-        t_U = np.random.normal(t_U, np.sqrt(sigma_t_squared_U))
-        # in E, B representation
-        t = ld.ks(t_Q+1j*t_U)
-        s_E  = (scov_ft_E/(scov_ft_E+tcov_ft))*np.fft.fft2(t.real)
-        s_B  = (scov_ft_B/(scov_ft_B+tcov_ft))*np.fft.fft2(t.imag)
-        s_E = np.random.normal(s_E.real*0., np.sqrt(sigma_s_squared_E)*size) + s_E
-        s_B = np.random.normal(s_B.real*0., np.sqrt(sigma_s_squared_B)*size) + s_B
-        s_E = np.fft.ifft2(s_E)
-        s_B = np.fft.ifft2(s_B)
-        # in Q, U representation
-        s = ld.ks_inv(s_E+1j*s_B)
-        if i%thinning==0:
-            samples[int(i/thinning)] = np.copy(s) 
-            if verbose==True:
-                print(i)
-    return samples
