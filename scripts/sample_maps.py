@@ -96,7 +96,8 @@ def main(_):
   # 4th channel for massivenu
   ps_halofit = jnp.array(ps_data[1,:] / pixel_size**2) # normalisation by pixel size
   # convert to pixel units of our simple power spectrum calculator
-  kell = ell / (360/3.5/0.5) / float(FLAGS.map_size)
+  #kell = ell / (360/3.5/0.5) / float(FLAGS.map_size)
+  kell = ell /2/jnp.pi * 360 * pixel_size / FLAGS.map_size
   # Interpolate the Power Spectrum in Fourier Space
   power_map = jnp.array(make_power_map(ps_halofit, FLAGS.map_size, kps=kell))
 
