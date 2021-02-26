@@ -1,4 +1,5 @@
-
+import sys
+sys.path = ['../'] + sys.path
 import jax.numpy as jnp
 from jax import grad, jit, vmap
 from jax_lensing.spectral import make_power_map
@@ -64,7 +65,8 @@ def spin_wiener_sampler(data_q, data_u, ncov_diag_Q,ncov_diag_U, input_ps_map_E,
 
     assert (iterations%thinning == 0)
     
-    samples = np.zeros(shape=(int(iterations/thinning), size,size), dtype=np.complex128)
+    samples_E = np.zeros(shape=(int(iterations/thinning), size,size))
+    samples_B = np.zeros(shape=(int(iterations/thinning), size,size))
     
     for i in range(iterations):
         # in Q, U representation
@@ -83,10 +85,11 @@ def spin_wiener_sampler(data_q, data_u, ncov_diag_Q,ncov_diag_U, input_ps_map_E,
         # in Q, U representation
         s = ks93(s_E,s_B)
         if i%thinning==0:
-            samples[int(i/thinning)] = s[0] + 1j*s[1] 
+            samples_E[int(i/thinning)] = s_E
+            samples_B[int(i/thinning)] = s_B
             if verbose==True:
                 print(i)
-    return samples
+    return samples_E,samples_B
 
 
 
