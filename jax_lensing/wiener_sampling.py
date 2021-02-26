@@ -79,6 +79,8 @@ def spin_wiener_sampler(data_q, data_u, ncov_diag_Q,ncov_diag_U, input_ps_map_E,
     sigma_t_squared_U =  tcov_diag  - tcov_diag * tcov_diag / ncov_diag_U
     sigma_s_squared_E =  scov_ft_E*tcov_ft/(tcov_ft+scov_ft_E)
     sigma_s_squared_B =  scov_ft_B*tcov_ft/(tcov_ft+scov_ft_B)
+    
+    print(sigma_s_squared_B.mean())
 
     if initial_map is None:
         s = data_q + 1j*data_u
@@ -87,25 +89,28 @@ def spin_wiener_sampler(data_q, data_u, ncov_diag_Q,ncov_diag_U, input_ps_map_E,
 
     assert (iterations%thinning == 0)
     
-    samples_E = np.zeros(shape=(int(iterations/thinning), size,size))
-    samples_B = np.zeros(shape=(int(iterations/thinning), size,size))
+    samples_E = np.zeros(shape=(int(iterations/thinning), size,size), dtype=jnp.complex128)
+    samples_B = np.zeros(shape=(int(iterations/thinning), size,size), dtype=jnp.complex128)
     
     for i in range(iterations):
         # in Q, U representation
         t_Q = (tcov_diag/ncov_diag_Q)*data_q + ((ncov_diag_Q-tcov_diag)/ncov_diag_Q) * s[0]
         t_U = (tcov_diag/ncov_diag_U)*data_u + ((ncov_diag_U-tcov_diag)/ncov_diag_U) * s[1]
-        t_Q = np.random.normal(t_Q.real, np.sqrt(sigma_t_squared_Q))
-        t_U = np.random.normal(t_U.real, np.sqrt(sigma_t_squared_U))
+        t_Q = np.random.normal(t_Q.real, np.sqrt(sigma_t_squared_Q.real))
+        t_U = np.random.normal(t_U.real, np.sqrt(sigma_t_squared_U.real))
         # in E, B representation
         t = ks93(t_Q,t_U)
         s_E = (scov_ft_E/(scov_ft_E+tcov_ft))*np.fft.fft2(t[0])
         s_B = (scov_ft_B/(scov_ft_B+tcov_ft))*np.fft.fft2(t[1])
-        s_E = np.random.normal(s_E.real*0., np.sqrt(sigma_s_squared_E)*size) + s_E
-        s_B = np.random.normal(s_B.real*0., np.sqrt(sigma_s_squared_B)*size) + s_B
-        s_E = np.fft.ifft2(s_E)
-        s_B = np.fft.ifft2(s_B)
-        # in Q, U representation
-        s = ks93(s_E,s_B)
+        
+        
+        s_E = np.random.normal(s_E.real*0., np.sqrt(sigma_s_squared_E.real)*size) + s_E
+        s_B = np.random.normal(s_B.real*0., np.sqrt(sigma_s_squared_B.real)*size) + s_B
+        s_E = (np.fft.ifft2(s_E))
+        s_E = (s_E.real + s_E.imag)
+        s_B = (np.fft.ifft2(s_B))
+        s_B = (s_B.real + s_B.imag)
+        s = ks93inv(s_E,s_B)
         if i%thinning==0:
             samples_E[int(i/thinning)] = s_E
             samples_B[int(i/thinning)] = s_B
