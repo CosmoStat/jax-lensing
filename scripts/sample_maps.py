@@ -1,11 +1,7 @@
 # Script for sampling constrained realisations
 import os
 # This line is for running on Jean Zay
-#os.environ['XLA_FLAGS']='--xla_gpu_cuda_data_dir=/gpfslocalsys/cuda/10.0'
-#os.environ['XLA_FLAGS']='--xla_gpu_cuda_data_dir=/gpfslocalsys/cuda/10.2.1'
 os.environ['XLA_FLAGS']='--xla_gpu_cuda_data_dir=/gpfslocalsys/cuda/10.1.2'
-
-#os.environ['XLA_FLAGS']='--xla_gpu_cuda_data_dir=/gpfslocalsys/cuda/10.1'
 
 
 from absl import app
@@ -171,7 +167,7 @@ def main(_):
   print('final max temperature', onp.max(trace[1][:,-1]))
   # TODO: apply final projection
   # Save the chain
-  fits.writeto("./results/samples_gp"+FLAGS.output_file+".fits", onp.array(samples),overwrite=True)
+  fits.writeto("./results/samples_gp"+FLAGS.output_file+".fits", onp.array(samples),overwrite=False)
 
 if __name__ == "__main__":
   app.run(main)
