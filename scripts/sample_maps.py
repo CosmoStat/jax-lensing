@@ -39,7 +39,7 @@ flags.DEFINE_float("initial_temperature", 0.15, "Initial temperature at which to
 flags.DEFINE_float("initial_step_size", 0.01, "Initial step size at which to perform sampling.")
 flags.DEFINE_integer("min_steps_per_temp", 10, "Minimum number of steps for each temperature.")
 flags.DEFINE_integer("num_steps", 5000, "Total number of steps in the chains.")
-flags.DEFINE_integer("output_steps", 2, "How many steps to output.")
+flags.DEFINE_integer("output_steps", 3, "How many steps to output.")
 flags.DEFINE_string("gaussian_path", "data/massivenu/mnu0.0_Maps10_PS_theory.npy", "Path to Massive Nu power spectrum.")
 flags.DEFINE_boolean("gaussian_only", False, "Only use Gaussian score if yes.")
 flags.DEFINE_boolean("reduced_shear", False, "Apply reduced shear correction if yes.")
