@@ -167,7 +167,7 @@ def main(_):
   print('final max temperature', onp.max(trace[1][:,-1]))
   # TODO: apply final projection
   # Save the chain
-  fits.writeto("./results/samples_gp"+FLAGS.output_file+".fits", onp.array(samples),overwrite=False)
+  fits.writeto("./results/gp2/samples_gp"+FLAGS.output_file+".fits", onp.array(samples),overwrite=False)
 
 if __name__ == "__main__":
   app.run(main)
