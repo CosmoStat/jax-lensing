@@ -7,7 +7,7 @@ from jax_lensing.inversion import ks93inv, ks93
 import numpy as np
 import gc
 import jax
-
+from jax import lax
 
 def spin_wiener_filter(data_q, data_u, ncov_diag_Q,ncov_diag_U, input_ps_map_E, input_ps_map_B, iterations=10):
     """
@@ -123,9 +123,8 @@ def spin_wiener_sampler(data_q, data_u, ncov_diag_Q,ncov_diag_U, input_ps_map_E,
 @jit
 def spin_wiener_filter_jit(data_q, data_u, ncov_diag_Q,ncov_diag_U, input_ps_map_E, input_ps_map_B, iterations=10, verbose=False):
     """
-    Broken :/
+    Similar to spin_wiener_filter, but with XLA acceleration
     """
-    print('This currently does not work')
     size = (data_q.real).shape[0]
     tcov_diag = jnp.min(jnp.array([ncov_diag_Q, ncov_diag_U]))
     tcov_ft = tcov_diag#/(size**2.)
@@ -140,8 +139,9 @@ def spin_wiener_filter_jit(data_q, data_u, ncov_diag_Q,ncov_diag_U, input_ps_map
     q_operationB = ((ncov_diag_Q-tcov_diag)/ncov_diag_Q)
     u_operationB = ((ncov_diag_U-tcov_diag)/ncov_diag_U)
 
-    for i in jnp.arange(iterations):
-        # in Q, U representation (fails here)
+    def body_fun(i, val):
+        s_q, s_u = val
+
         t_Q  = q_operationA + jnp.multiply(q_operationB,s_q)
         t_U  = u_operationA + jnp.multiply(u_operationB,s_u)
         # in E, B representation
@@ -152,5 +152,9 @@ def spin_wiener_filter_jit(data_q, data_u, ncov_diag_Q,ncov_diag_U, input_ps_map
         s_B = jnp.fft.ifft2(s_B)
         # in Q, U representation
         s_q, s_u = ks93inv(s_E,s_B)
+   
+        return (s_q, s_u)
+    
+    (s_q, s_u) = lax.fori_loop(0, iterations, body_fun, (s_q, s_u))
 
     return s_q,s_u
