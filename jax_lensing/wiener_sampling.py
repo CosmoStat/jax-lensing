@@ -119,7 +119,6 @@ def spin_wiener_sampler(data_q, data_u, ncov_diag_Q,ncov_diag_U, input_ps_map_E,
     return samples_E, samples_B
 
 
-# doesn't work :/
 @jit
 def spin_wiener_filter_jit(data_q, data_u, ncov_diag_Q,ncov_diag_U, input_ps_map_E, input_ps_map_B, iterations=10, verbose=False):
     """
