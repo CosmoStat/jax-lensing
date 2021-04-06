@@ -22,13 +22,14 @@ import tensorflow.compat.v2 as tf
 tf.enable_v2_behavior()
 import tensorflow_datasets as tfds
 
-from jax_lensing.models.convdae2 import SmallUResNet, MediumUResNet
+#from jax_lensing.models.convdae2 import SmallUResNet, MediumUResNet
+from jax_lensing.models.convdae import SmallUResNet
 from jax_lensing.models.normalization import SNParamsTree as CustomSNParamsTree
 from jax_lensing.spectral import make_power_map
 from jax_lensing.utils import load_dataset
 
 flags.DEFINE_string("dataset", "kappatng", "Suite of simulations to learn from")
-flags.DEFINE_string("output_dir", "./weights/gp-sn1v2", "Folder where to store model.")
+flags.DEFINE_string("output_dir", "./weights/gp-sn1v5", "Folder where to store model.")
 flags.DEFINE_integer("batch_size", 32, "Size of the batch to train on.")
 flags.DEFINE_float("learning_rate", 0.0001, "Learning rate for the optimizer.")
 flags.DEFINE_integer("training_steps", 45000, "Number of training steps to run.")
@@ -38,7 +39,8 @@ flags.DEFINE_float("spectral_norm", 1, "Amount of spectral normalization.")
 flags.DEFINE_boolean("gaussian_prior", True, "Whether to train including Gaussian prior information.")
 flags.DEFINE_string("gaussian_path", "data/ktng/ktng_PS_theory.npy", "Path to Massive Nu power spectrum.")
 flags.DEFINE_string("variant", "EiffL", "Variant of model.")
-flags.DEFINE_string("model", "MediumUResNet", "Name of model.")
+#flags.DEFINE_string("model", "MediumUResNet", "Name of model.")
+flags.DEFINE_string("model", "SmallUResNet", "Name of model.")
 flags.DEFINE_integer("map_size", 360, "Size of maps after cropping")
 flags.DEFINE_float("resolution", 0.29, "Resolution in arcmin/pixel")
 
@@ -112,7 +114,8 @@ def main(_):
     # massivenu: channel 4
     ps_halofit = jnp.array(ps_data[1,:] / pixel_size**2) # normalisation by pixel size
     # convert to pixel units of our simple power spectrum calculator
-    kell = ell / (360/3.5/0.5) / float(FLAGS.map_size)
+    #kell = ell / (360/3.5/0.5) / float(FLAGS.map_size)
+    kell = ell /2/jnp.pi * 360 * pixel_size / FLAGS.map_size
     # Interpolate the Power Spectrum in Fourier Space
     power_map = jnp.array(make_power_map(ps_halofit, FLAGS.map_size, kps=kell))
 
