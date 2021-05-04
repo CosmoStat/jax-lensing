@@ -18,16 +18,15 @@ from astropy.io import fits
 import tensorflow.compat.v2 as tf
 tf.enable_v2_behavior()
 
-from jax_lensing.models.convdae2 import SmallUResNet, MediumUResNet
+from jax_lensing.models.convdae import SmallUResNet
+from jax_lensing.models.convdae2 import MediumUResNet
 from jax_lensing.models.normalization import SNParamsTree as CustomSNParamsTree
 from jax_lensing.spectral import make_power_map
 from jax_lensing.inversion import ks93inv, ks93
-from jax_lensing.clusters import gen_nfw_shear
-
+from jax_lensing.cluster import gen_nfw_shear
+from jax_lensing.samplers.procedures import tempered_HMC
 
 import tensorflow_probability as tfp; tfp = tfp.experimental.substrates.jax
-from jax_lensing.samplers.score_samplers import ScoreHamiltonianMonteCarlo
-from jax_lensing.samplers.tempered_sampling import TemperedMC
 
 flags.DEFINE_string("output_file", "samples.fits", "Filename of output samples.")
 #flags.DEFINE_string("shear", "gamma.fits", "Path to input shear maps.")
@@ -50,10 +49,9 @@ flags.DEFINE_integer("map_size", 360, "Map size")
 flags.DEFINE_float("resolution", 0.29, "Map resoultion arcmin/pixel")
 flags.DEFINE_integer("x_cluster", 100, "x-coordinate of the cluster")
 flags.DEFINE_integer("y_cluster", 100, "y-coordinate of the cluster")
-flags.DEFINE_integer("z_halo", .5, "redshift of the cluster")
-flags.DEFINE_integer("mass_halo", 1e15, "mass of the cluster (in solar mass)")
-flags.DEFINE_integer("y_cluster", 100, "y-coordinate of the cluster")
-flags.DEFINE_integer("zs", 1, "redshif of the source")
+flags.DEFINE_float("z_halo", .5, "redshift of the cluster")
+flags.DEFINE_float("mass_halo", 3e15, "mass of the cluster (in solar mass)")
+flags.DEFINE_float("zs", 1, "redshif of the source")
 
 
 FLAGS = flags.FLAGS
@@ -113,10 +111,11 @@ def main(_):
 
 
   # Load the noiseless convergence map
-  convergence = np.load(FLAGS.convergence).astype('float32') #Convergence is expected in the format [FLAGS.map_size,FLAGS.map_size,1]
+  convergence= fits.getdata(FLAGS.convergence).astype('float32')
+  #convergence = onp.load(FLAGS.convergence).astype('float32') #Convergence is expected in the format [FLAGS.map_size,FLAGS.map_size,1]
   
   # Get the correspinding shear
-  gamma1, gamma2 = ks93inv(convergence[...,0], np.zeros_like(convergence[...,0])) 
+  gamma1, gamma2 = ks93inv(convergence, onp.zeros_like(convergence)) 
   
   # Compute NFW profile shear map
   g1_NFW, g2_NFW = gen_nfw_shear(x_cen=FLAGS.x_cluster, y_cen=FLAGS.y_cluster, 
@@ -132,13 +131,13 @@ def main(_):
   ke_cluster, kb_cluster = ks93(g1_cluster, g2_cluster)
 
   # Add noise the shear map
-  g1_cluster += FLAGS.sigma_gamma * np.random.randn(FLAGS.batch_size, FLAGS.map_size,FLAGS.map_size)
-  g2_cluster += FLAGS.sigma_gamma * np.random.randn(FLAGS.batch_size, FLAGS.map_size,FLAGS.map_size)
+  g1_cluster += FLAGS.sigma_gamma * onp.random.randn(FLAGS.map_size,FLAGS.map_size)
+  g2_cluster += FLAGS.sigma_gamma * onp.random.randn(FLAGS.map_size,FLAGS.map_size)
 
 
   # Load the shear maps and corresponding mask
-  gamma = np.stack([g1_cluster, g2_cluster]) # Shear is expected in the format [FLAGS.map_size,FLAGS.map_size,2]
-  mask = jnp.expand_dims(np.ones_like(g1_cluster), -1) # has shape [FLAGS.map_size,FLAGS.map_size,1]
+  gamma = onp.stack([g1_cluster, g2_cluster], -1) # Shear is expected in the format [FLAGS.map_size,FLAGS.map_size,2]
+  mask = jnp.expand_dims(onp.ones_like(g1_cluster), -1) # has shape [FLAGS.map_size,FLAGS.map_size,1]
 
   #gamma = fits.getdata(FLAGS.shear).astype('float32') # Shear is expected in the format [FLAGS.map_size,FLAGS.map_size,2]
   #mask = jnp.expand_dims(fits.getdata(FLAGS.mask).astype('float32'), -1) # has shape [FLAGS.map_size,FLAGS.map_size,1]
@@ -173,7 +172,8 @@ def main(_):
                                 total_score_fn=total_score_fn,
                                 batch_size=FLAGS.batch_size,
                                 initial_temperature=FLAGS.initial_temperature,
-                                min_steps_per_temp=min_steps_per_temp,
+                                initial_step_size=FLAGS.initial_step_size,
+                                min_steps_per_temp=FLAGS.min_steps_per_temp,
                                 num_results=10,
                                 num_burnin_steps=0
                                 )
@@ -183,7 +183,7 @@ def main(_):
   print('final max temperature', onp.max(trace[1][:,-1]))
   # TODO: apply final projection
   # Save the chain
-  fits.writeto("./results/gp2/samples_gp"+FLAGS.output_file+".fits", onp.array(samples),overwrite=False)
+  fits.writeto("./results/cluster/samples_"+FLAGS.output_file+".fits", onp.array(samples),overwrite=False)
 
 if __name__ == "__main__":
   app.run(main)
