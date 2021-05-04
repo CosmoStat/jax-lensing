@@ -169,4 +169,21 @@ def main(_):
   kappa_init, _ = jax.vmap(ks93)(gamma_init[...,0], gamma_init[...,1])
   # we only care about kappa_e
 
+  samples, trace = tempered_HMC(init_image=kappa_init,
+                                total_score_fn=total_score_fn,
+                                batch_size=FLAGS.batch_size,
+                                initial_temperature=FLAGS.initial_temperature,
+                                min_steps_per_temp=min_steps_per_temp,
+                                num_results=10,
+                                num_burnin_steps=0
+                                )
 
+
+  print('average acceptance rate', onp.mean(trace[0]))
+  print('final max temperature', onp.max(trace[1][:,-1]))
+  # TODO: apply final projection
+  # Save the chain
+  fits.writeto("./results/gp2/samples_gp"+FLAGS.output_file+".fits", onp.array(samples),overwrite=False)
+
+if __name__ == "__main__":
+  app.run(main)
