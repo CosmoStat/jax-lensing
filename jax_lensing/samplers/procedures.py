@@ -32,7 +32,7 @@ def tempered_HMC(init_image,
             num_delta_logp_steps=4)
 
 
-  num_results = int(5e3)
+  num_results = int(6e3)
   num_burnin_steps = int(0)
 
 

@@ -50,7 +50,7 @@ flags.DEFINE_float("resolution", 0.29, "Map resoultion arcmin/pixel")
 flags.DEFINE_integer("x_cluster", 100, "x-coordinate of the cluster")
 flags.DEFINE_integer("y_cluster", 100, "y-coordinate of the cluster")
 flags.DEFINE_float("z_halo", .5, "redshift of the cluster")
-flags.DEFINE_float("mass_halo", 3e15, "mass of the cluster (in solar mass)")
+flags.DEFINE_float("mass_halo", 2e15, "mass of the cluster (in solar mass)")
 flags.DEFINE_float("zs", 1, "redshif of the source")
 
 
