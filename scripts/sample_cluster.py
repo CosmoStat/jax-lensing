@@ -28,6 +28,7 @@ from jax_lensing.samplers.procedures import tempered_HMC
 
 import tensorflow_probability as tfp; tfp = tfp.experimental.substrates.jax
 
+flags.DEFINE_string("output_folder", "100_100_.5_3e14_1", "Name of the output folder.")
 flags.DEFINE_string("output_file", "samples.fits", "Filename of output samples.")
 #flags.DEFINE_string("shear", "gamma.fits", "Path to input shear maps.")
 flags.DEFINE_string("convergence", "convergence.npy", "Path to input noiseless convergence maps.")
@@ -47,6 +48,7 @@ flags.DEFINE_boolean("gaussian_only", False, "Only use Gaussian score if yes.")
 flags.DEFINE_boolean("reduced_shear", False, "Apply reduced shear correction if yes.")
 flags.DEFINE_integer("map_size", 360, "Map size")
 flags.DEFINE_float("resolution", 0.29, "Map resoultion arcmin/pixel")
+flags.DEFINE_boolean("no_cluster", False, "No added cluster if True")
 flags.DEFINE_integer("x_cluster", 100, "x-coordinate of the cluster")
 flags.DEFINE_integer("y_cluster", 100, "y-coordinate of the cluster")
 flags.DEFINE_float("z_halo", .5, "redshift of the cluster")
@@ -117,27 +119,28 @@ def main(_):
   # Get the correspinding shear
   gamma1, gamma2 = ks93inv(convergence, onp.zeros_like(convergence)) 
   
-  # Compute NFW profile shear map
-  g1_NFW, g2_NFW = gen_nfw_shear(x_cen=FLAGS.x_cluster, y_cen=FLAGS.y_cluster, 
-                                 resolution=FLAGS.resolution,
-                                 nx=FLAGS.map_size, ny=FLAGS.map_size, z=FLAGS.z_halo,
-                                 m=FLAGS.mass_halo, zs=FLAGS.zs)
-  # Shear with added NFW cluster
-  g1_cluster = gamma1 + g1_NFW
-  g2_cluster = gamma2 + g2_NFW
+  if not FLAGS.no_cluster: 
+    # Compute NFW profile shear map
+    g1_NFW, g2_NFW = gen_nfw_shear(x_cen=FLAGS.x_cluster, y_cen=FLAGS.y_cluster, 
+                                   resolution=FLAGS.resolution,
+                                   nx=FLAGS.map_size, ny=FLAGS.map_size, z=FLAGS.z_halo,
+                                   m=FLAGS.mass_halo, zs=FLAGS.zs)
+    # Shear with added NFW cluster
+    gamma1 += g1_NFW
+    gamma2 += g2_NFW
   
 
-  # Target convergence map with the added cluster
-  ke_cluster, kb_cluster = ks93(g1_cluster, g2_cluster)
+    # Target convergence map with the added cluster
+    #ke_cluster, kb_cluster = ks93(g1_cluster, g2_cluster)
 
-  # Add noise the shear map
-  g1_cluster += FLAGS.sigma_gamma * onp.random.randn(FLAGS.map_size,FLAGS.map_size)
-  g2_cluster += FLAGS.sigma_gamma * onp.random.randn(FLAGS.map_size,FLAGS.map_size)
+    # Add noise the shear map
+    gamma1 += FLAGS.sigma_gamma * onp.random.randn(FLAGS.map_size,FLAGS.map_size)
+    gamma2 += FLAGS.sigma_gamma * onp.random.randn(FLAGS.map_size,FLAGS.map_size)
 
 
   # Load the shear maps and corresponding mask
-  gamma = onp.stack([g1_cluster, g2_cluster], -1) # Shear is expected in the format [FLAGS.map_size,FLAGS.map_size,2]
-  mask = jnp.expand_dims(onp.ones_like(g1_cluster), -1) # has shape [FLAGS.map_size,FLAGS.map_size,1]
+  gamma = onp.stack([gamma1, gamma2], -1) # Shear is expected in the format [FLAGS.map_size,FLAGS.map_size,2]
+  mask = jnp.expand_dims(onp.ones_like(gamma1), -1) # has shape [FLAGS.map_size,FLAGS.map_size,1]
 
   #gamma = fits.getdata(FLAGS.shear).astype('float32') # Shear is expected in the format [FLAGS.map_size,FLAGS.map_size,2]
   #mask = jnp.expand_dims(fits.getdata(FLAGS.mask).astype('float32'), -1) # has shape [FLAGS.map_size,FLAGS.map_size,1]
@@ -183,7 +186,7 @@ def main(_):
   print('final max temperature', onp.max(trace[1][:,-1]))
   # TODO: apply final projection
   # Save the chain
-  fits.writeto("./results/cluster/samples_"+FLAGS.output_file+".fits", onp.array(samples),overwrite=False)
+  fits.writeto("./results/cluster/"+FLAGS.output_folder+"/samples_"+FLAGS.output_file+".fits", onp.array(samples),overwrite=False)
 
 if __name__ == "__main__":
   app.run(main)
