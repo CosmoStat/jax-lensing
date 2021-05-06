@@ -24,7 +24,7 @@ def gen_nfw_shear(x_cen, y_cen, resolution, nx, ny, z, m, zs=None, redshift_dist
 
     for i in range(ny):
         for j in range(nx):
-            if i-y_cen > 0:
+            if i-x_cen > 0:
                 phi_halo[i,j] =  np.arccos((j-y_cen) / dist_from_halo[i,j])
             else:
                 phi_halo[i,j] = 2*np.pi - np.arccos((j-y_cen) / dist_from_halo[i,j])
