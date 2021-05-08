@@ -302,7 +302,6 @@ class UResNet(hk.Module):
     out = inputs
     if self.pad_crop:
         out, padding = pad_for_pool(inputs, 4)
-    
     out = jnp.concatenate([out, condition*jnp.ones_like(out)[...,[0]]], axis=-1)
     out = self.initial_conv(out)
     if self.variant == "Zacc":
