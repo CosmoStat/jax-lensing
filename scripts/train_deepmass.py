@@ -14,6 +14,7 @@ from jax.experimental import optix
 import numpy as onp
 import pickle
 from functools import partial
+from astropy.io import fits
 
 from flax.metrics import tensorboard
 
@@ -22,7 +23,8 @@ import tensorflow.compat.v2 as tf
 tf.enable_v2_behavior()
 import tensorflow_datasets as tfds
 
-from jax_lensing.models.convdae2 import SmallUResNet, MediumUResNet
+from jax_lensing.models.convdae import SmallUResNet
+from jax_lensing.models.convdae2 import MediumUResNet
 from jax_lensing.models.normalization import SNParamsTree as CustomSNParamsTree
 from jax_lensing.spectral import make_power_map
 from jax_lensing.utils import load_dataset_deepmass
@@ -30,15 +32,15 @@ from jax_lensing.inversion import ks93, ks93inv
 
 flags.DEFINE_string("dataset", "kappatng", "Suite of simulations to learn from")
 flags.DEFINE_string("output_dir", "./weights/deepmass-sn1v2", "Folder where to store model.")
-flags.DEFINE_integer("batch_size", 32, "Size of the batch to train on.")
+flags.DEFINE_integer("batch_size", 28, "Size of the batch to train on.")
 flags.DEFINE_float("learning_rate", 0.0001, "Learning rate for the optimizer.")
 flags.DEFINE_integer("training_steps", 45000, "Number of training steps to run.")
 flags.DEFINE_string("train_split", "90%", "How much of the training set to use.")
-flags.DEFINE_string("mask", "mask.fits", "Path to input mask.")
+flags.DEFINE_string("mask", "../data/COSMOS/cosmos_full_mask_0.29arcmin360copy.fits", "Path to input mask.")
 flags.DEFINE_float("sigma_gamma", 0.15, "Standard deviation of shear.")
 flags.DEFINE_float("spectral_norm", 1, "Amount of spectral normalization.")
 flags.DEFINE_string("variant", "EiffL", "Variant of model.")
-flags.DEFINE_string("model", "MediumUResNet", "Name of model.")
+flags.DEFINE_string("model", "SmallUResNet", "Name of model.")
 flags.DEFINE_integer("map_size", 360, "Size of maps after cropping")
 flags.DEFINE_float("resolution", 0.29, "Resolution in arcmin/pixel")
 
@@ -64,6 +66,9 @@ def lr_schedule(step):
 
   index = jnp.sum(boundaries < step)
   return jnp.take(values, index)
+
+ks93 = jax.vmap(ks93)
+ks93inv = jax.vmap(ks93inv)
 
 def main(_):
   # Make the network
@@ -99,12 +104,15 @@ def main(_):
     key1, key2, key3 = jax.random.split(rng_key, 3)
     # Preprocess the batch for deep mass, i.e. apply KS, add noise, mask, and
     # do inverse Kaiser-Squires
-    input_map = batch['x'][..., 0]  # We don't care for the last dimension
+    input_map = batch['x'][...,0]
     g1, g2 = ks93inv(input_map, jnp.zeros_like(input_map))
+    
     # Add Gaussian noise and mask
-    g1 = mask * (g1 + FLAGS.sigma_gamma*jnp.random.normal(key1, g1.shape))
-    g2 = mask * (g2 + FLAGS.sigma_gamma*jnp.random.normal(key2, g2.shape))
+    g1 = mask * (g1 + FLAGS.sigma_gamma*jax.random.normal(key1, g1.shape))
+    g2 = mask * (g2 + FLAGS.sigma_gamma*jax.random.normal(key2, g2.shape))
     ks_map, _ = ks93(g1, g2)
+    ks_map = jnp.expand_dims(ks_map,-1)
+    
     # Apply model
     res, state = model.apply(params, state, key3, ks_map, is_training=True)
     loss = jnp.mean((input_map - res[..., 0])**2)
@@ -132,6 +140,10 @@ def main(_):
                                                       next(train))
 
     summary_writer.scalar('train_loss', loss, step)
+
+    if step ==10:
+      with open(FLAGS.output_dir+'/model-%d.pckl'%step, 'wb') as file:
+        pickle.dump([params, state, sn_state], file)
 
     if step%100==0:
         print(step, loss)
