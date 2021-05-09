@@ -189,7 +189,7 @@ class UResNet(hk.Module):
                use_bn=True,
                pad_crop=False,
                variant='EiffL',
-               deepmass=Flase,
+               deepmass=False,
                name=None):
     """Constructs a Residual UNet model based on a traditional ResNet.
     Args:
@@ -225,6 +225,7 @@ class UResNet(hk.Module):
     bn_config.setdefault("create_scale", True)
     bn_config.setdefault("create_offset", True)
     self.variant = variant
+    self.deepmass = deepmass
     self.strides = strides
     bl = len(self.strides)
 
@@ -331,7 +332,7 @@ class UResNet(hk.Module):
         condition_normalisation = (jnp.abs(condition)*jnp.ones_like(pad_for_pool(inputs, 4)[0])+1e-3)
     else:
         condition_normalisation = (jnp.abs(condition)*jnp.ones_like(inputs)+1e-3)
-    if deepmass:
+    if self.deepmass:
       out = out
     else: 
       out = out / condition_normalisation
