@@ -377,4 +377,5 @@ class SmallUResNet(UResNet):
                      pad_crop=pad_crop,
                      n_output_channels=n_output_channels,
                      variant=variant,
+                     deepmass=deepmass,
                      name=name)
