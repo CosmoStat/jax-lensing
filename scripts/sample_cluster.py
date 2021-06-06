@@ -120,6 +120,7 @@ def main(_):
   gamma1, gamma2 = ks93inv(convergence, onp.zeros_like(convergence)) 
   
   if not FLAGS.no_cluster: 
+    print('adding a cluster')
     # Compute NFW profile shear map
     g1_NFW, g2_NFW = gen_nfw_shear(x_cen=FLAGS.x_cluster, y_cen=FLAGS.y_cluster, 
                                    resolution=FLAGS.resolution,
