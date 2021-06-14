@@ -28,6 +28,7 @@ from jax_lensing.samplers.score_samplers import ScoreHamiltonianMonteCarlo
 from jax_lensing.samplers.tempered_sampling import TemperedMC
 
 flags.DEFINE_string("output_file", "samples.fits", "Filename of output samples.")
+flags.DEFINE_string("output_folder", "COSMOS", "Filename of output folder.")
 flags.DEFINE_string("shear", "gamma.fits", "Path to input shear maps.")
 flags.DEFINE_string("mask", "mask.fits", "Path to input mask.")
 flags.DEFINE_float("sigma_gamma", 0.15, "Standard deviation of shear.")
@@ -43,6 +44,7 @@ flags.DEFINE_integer("output_steps", 3, "How many steps to output.")
 flags.DEFINE_string("gaussian_path", "data/massivenu/mnu0.0_Maps10_PS_theory.npy", "Path to Massive Nu power spectrum.")
 flags.DEFINE_boolean("gaussian_only", False, "Only use Gaussian score if yes.")
 flags.DEFINE_boolean("reduced_shear", False, "Apply reduced shear correction if yes.")
+flags.DEFINE_boolean("COSMOS", False, "COSMOS catalog")
 flags.DEFINE_integer("map_size", 360, "Map size")
 flags.DEFINE_float("resolution", 0.29, "Map resoultion arcmin/pixel")
 
@@ -102,7 +104,12 @@ def main(_):
   power_map = jnp.array(make_power_map(ps_halofit, FLAGS.map_size, kps=kell))
 
   # Load the shear maps and corresponding mask
-  gamma = fits.getdata(FLAGS.shear).astype('float32') # Shear is expected in the format [FLAGS.map_size,FLAGS.map_size,2]
+  if COSMOS==True:
+    g1 = fits.getdata('../data/COSMOS/cosmos_full_e1_0.29arcmin360.fits').astype('float32').reshape([FLAGS.map_size, FLAGS.map_size, 1])
+    g2 = fits.getdata('../data/COSMOS/cosmos_full_e2_0.29arcmin360.fits').astype('float32').reshape([FLAGS.map_size, FLAGS.map_size, 1])
+    gamma = jnp.stack([g1, g2], axis=-1)
+  else:
+    gamma = fits.getdata(FLAGS.shear).astype('float32') # Shear is expected in the format [FLAGS.map_size,FLAGS.map_size,2]
   mask = jnp.expand_dims(fits.getdata(FLAGS.mask).astype('float32'), -1) # has shape [FLAGS.map_size,FLAGS.map_size,1]
 
   @jax.jit
@@ -167,7 +174,7 @@ def main(_):
   print('final max temperature', onp.max(trace[1][:,-1]))
   # TODO: apply final projection
   # Save the chain
-  fits.writeto("./results/gp2/samples_gp"+FLAGS.output_file+".fits", onp.array(samples),overwrite=False)
+  fits.writeto("./results/"+FLAGS.output_folder+'/'+FLAGS.output_file+".fits", onp.array(samples),overwrite=False)
 
 if __name__ == "__main__":
   app.run(main)
