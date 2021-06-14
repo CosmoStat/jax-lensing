@@ -134,9 +134,9 @@ def main(_):
     # Target convergence map with the added cluster
     #ke_cluster, kb_cluster = ks93(g1_cluster, g2_cluster)
 
-    # Add noise the shear map
-    gamma1 += FLAGS.sigma_gamma * onp.random.randn(FLAGS.map_size,FLAGS.map_size)
-    gamma2 += FLAGS.sigma_gamma * onp.random.randn(FLAGS.map_size,FLAGS.map_size)
+  # Add noise the shear map
+  gamma1 += FLAGS.sigma_gamma * onp.random.randn(FLAGS.map_size,FLAGS.map_size)
+  gamma2 += FLAGS.sigma_gamma * onp.random.randn(FLAGS.map_size,FLAGS.map_size)
 
 
   # Load the shear maps and corresponding mask
