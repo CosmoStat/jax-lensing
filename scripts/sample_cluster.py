@@ -54,7 +54,7 @@ flags.DEFINE_integer("y_cluster", 100, "y-coordinate of the cluster")
 flags.DEFINE_float("z_halo", .5, "redshift of the cluster")
 flags.DEFINE_float("mass_halo", 2e15, "mass of the cluster (in solar mass)")
 flags.DEFINE_float("zs", 1, "redshif of the source")
-
+flags.DEFINE_boolean("COSMOS", False, "COSMOS catalog")
 
 FLAGS = flags.FLAGS
 
@@ -113,38 +113,51 @@ def main(_):
 
 
   # Load the noiseless convergence map
-  convergence= fits.getdata(FLAGS.convergence).astype('float32')
-  #convergence = onp.load(FLAGS.convergence).astype('float32') #Convergence is expected in the format [FLAGS.map_size,FLAGS.map_size,1]
+  if not FLAGS.COSMOS:
+    convergence= fits.getdata(FLAGS.convergence).astype('float32')
+    #convergence = onp.load(FLAGS.convergence).astype('float32') #Convergence is expected in the format [FLAGS.map_size,FLAGS.map_size,1]
   
-  # Get the correspinding shear
-  gamma1, gamma2 = ks93inv(convergence, onp.zeros_like(convergence)) 
+    # Get the correspinding shear
+    gamma1, gamma2 = ks93inv(convergence, onp.zeros_like(convergence)) 
   
-  if not FLAGS.no_cluster: 
-    print('adding a cluster')
-    # Compute NFW profile shear map
-    g1_NFW, g2_NFW = gen_nfw_shear(x_cen=FLAGS.x_cluster, y_cen=FLAGS.y_cluster, 
+    if not FLAGS.no_cluster: 
+      print('adding a cluster')
+      # Compute NFW profile shear map
+      g1_NFW, g2_NFW = gen_nfw_shear(x_cen=FLAGS.x_cluster, y_cen=FLAGS.y_cluster, 
                                    resolution=FLAGS.resolution,
                                    nx=FLAGS.map_size, ny=FLAGS.map_size, z=FLAGS.z_halo,
                                    m=FLAGS.mass_halo, zs=FLAGS.zs)
-    # Shear with added NFW cluster
-    gamma1 += g1_NFW
-    gamma2 += g2_NFW
+      # Shear with added NFW cluster
+      gamma1 += g1_NFW
+      gamma2 += g2_NFW
   
 
-    # Target convergence map with the added cluster
-    #ke_cluster, kb_cluster = ks93(g1_cluster, g2_cluster)
+      # Target convergence map with the added cluster
+      #ke_cluster, kb_cluster = ks93(g1_cluster, g2_cluster)
 
-  # Add noise the shear map
-  gamma1 += FLAGS.sigma_gamma * onp.random.randn(FLAGS.map_size,FLAGS.map_size)
-  gamma2 += FLAGS.sigma_gamma * onp.random.randn(FLAGS.map_size,FLAGS.map_size)
+    # Add noise the shear map
+    gamma1 += FLAGS.sigma_gamma * onp.random.randn(FLAGS.map_size,FLAGS.map_size)
+    gamma2 += FLAGS.sigma_gamma * onp.random.randn(FLAGS.map_size,FLAGS.map_size)
 
 
+    # Load the shear maps and corresponding mask
+    #gamma = onp.stack([gamma1, gamma2], -1) # Shear is expected in the format [FLAGS.map_size,FLAGS.map_size,2]
+    #mask = jnp.expand_dims(onp.ones_like(gamma1), -1) # has shape [FLAGS.map_size,FLAGS.map_size,1]
+
+    #gamma = fits.getdata(FLAGS.shear).astype('float32') # Shear is expected in the format [FLAGS.map_size,FLAGS.map_size,2]
+    #mask = jnp.expand_dims(fits.getdata(FLAGS.mask).astype('float32'), -1) # has shape [FLAGS.map_size,FLAGS.map_size,1]
+  
   # Load the shear maps and corresponding mask
-  gamma = onp.stack([gamma1, gamma2], -1) # Shear is expected in the format [FLAGS.map_size,FLAGS.map_size,2]
-  mask = jnp.expand_dims(onp.ones_like(gamma1), -1) # has shape [FLAGS.map_size,FLAGS.map_size,1]
+  if FLAGS.COSMOS==True:
+    g1 = fits.getdata('../data/COSMOS/cosmos_full_e1_0.29arcmin360.fits').astype('float32').reshape([FLAGS.map_size, FLAGS.map_size, 1])
+    g2 = fits.getdata('../data/COSMOS/cosmos_full_e2_0.29arcmin360.fits').astype('float32').reshape([FLAGS.map_size, FLAGS.map_size, 1])
+    gamma = onp.concatenate([g1, g2], axis=-1)
+  else:
+    # Load the shear maps and corresponding mask
+    gamma = onp.stack([gamma1, gamma2], -1) # Shear is expected in the format [FLAGS.map_size,FLAGS.map_size,2]
 
-  #gamma = fits.getdata(FLAGS.shear).astype('float32') # Shear is expected in the format [FLAGS.map_size,FLAGS.map_size,2]
-  #mask = jnp.expand_dims(fits.getdata(FLAGS.mask).astype('float32'), -1) # has shape [FLAGS.map_size,FLAGS.map_size,1]
+    #gamma = fits.getdata(FLAGS.shear).astype('float32') # Shear is expected in the format [FLAGS.map_size,FLAGS.map_size,2]
+  mask = jnp.expand_dims(fits.getdata(FLAGS.mask).astype('float32'), -1) # has shape [FLAGS.map_size,FLAGS.map_size,1]
 
   @jax.jit
   def total_score_fn(x, sigma):
@@ -167,7 +180,11 @@ def main(_):
 
   # Prepare the first guess convergence by adding noise in the holes and performing
   # a KS inversion
+  print(gamma.shape)
+  print(jnp.repeat(jnp.expand_dims(mask*gamma,0), FLAGS.batch_size, axis=0).shape)
+  print((jnp.expand_dims((1. - mask)*FLAGS.sigma_gamma,0)*onp.random.randn(FLAGS.batch_size, FLAGS.map_size, FLAGS.map_size, 2)).shape)
   gamma_init = (jnp.repeat(jnp.expand_dims(mask*gamma,0), FLAGS.batch_size, axis=0) +
+                
                 jnp.expand_dims((1. - mask)*FLAGS.sigma_gamma,0)*onp.random.randn(FLAGS.batch_size, FLAGS.map_size, FLAGS.map_size, 2))
   kappa_init, _ = jax.vmap(ks93)(gamma_init[...,0], gamma_init[...,1])
   # we only care about kappa_e
@@ -187,7 +204,7 @@ def main(_):
   print('final max temperature', onp.max(trace[1][:,-1]))
   # TODO: apply final projection
   # Save the chain
-  fits.writeto("./results/cluster/"+FLAGS.output_folder+"/samples_"+FLAGS.output_file+".fits", onp.array(samples),overwrite=False)
+  fits.writeto("./results/"+FLAGS.output_folder+"/samples_"+FLAGS.output_file+".fits", onp.array(samples),overwrite=False)
 
 if __name__ == "__main__":
   app.run(main)
