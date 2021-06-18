@@ -114,6 +114,7 @@ def main(_):
 
   # Load the noiseless convergence map
   if not FLAGS.COSMOS:
+    print('i am here')
     convergence= fits.getdata(FLAGS.convergence).astype('float32')
     #convergence = onp.load(FLAGS.convergence).astype('float32') #Convergence is expected in the format [FLAGS.map_size,FLAGS.map_size,1]
   
@@ -141,22 +142,19 @@ def main(_):
 
 
     # Load the shear maps and corresponding mask
-    #gamma = onp.stack([gamma1, gamma2], -1) # Shear is expected in the format [FLAGS.map_size,FLAGS.map_size,2]
+    gamma = onp.stack([gamma1, gamma2], -1) # Shear is expected in the format [FLAGS.map_size,FLAGS.map_size,2]
     #mask = jnp.expand_dims(onp.ones_like(gamma1), -1) # has shape [FLAGS.map_size,FLAGS.map_size,1]
 
     #gamma = fits.getdata(FLAGS.shear).astype('float32') # Shear is expected in the format [FLAGS.map_size,FLAGS.map_size,2]
     #mask = jnp.expand_dims(fits.getdata(FLAGS.mask).astype('float32'), -1) # has shape [FLAGS.map_size,FLAGS.map_size,1]
-  
-  # Load the shear maps and corresponding mask
-  if FLAGS.COSMOS==True:
+
+  else:
+
+    # Load the shear maps and corresponding mask
     g1 = fits.getdata('../data/COSMOS/cosmos_full_e1_0.29arcmin360.fits').astype('float32').reshape([FLAGS.map_size, FLAGS.map_size, 1])
     g2 = fits.getdata('../data/COSMOS/cosmos_full_e2_0.29arcmin360.fits').astype('float32').reshape([FLAGS.map_size, FLAGS.map_size, 1])
     gamma = onp.concatenate([g1, g2], axis=-1)
-  else:
-    # Load the shear maps and corresponding mask
-    gamma = onp.stack([gamma1, gamma2], -1) # Shear is expected in the format [FLAGS.map_size,FLAGS.map_size,2]
 
-    #gamma = fits.getdata(FLAGS.shear).astype('float32') # Shear is expected in the format [FLAGS.map_size,FLAGS.map_size,2]
   mask = jnp.expand_dims(fits.getdata(FLAGS.mask).astype('float32'), -1) # has shape [FLAGS.map_size,FLAGS.map_size,1]
 
   @jax.jit
