@@ -37,6 +37,8 @@ flags.DEFINE_float("learning_rate", 0.0001, "Learning rate for the optimizer.")
 flags.DEFINE_integer("training_steps", 45000, "Number of training steps to run.")
 flags.DEFINE_string("train_split", "90%", "How much of the training set to use.")
 flags.DEFINE_string("mask", "../data/COSMOS/cosmos_full_mask_0.29arcmin360copy.fits", "Path to input mask.")
+flags.DEFINE_string("std1", "../data/COSMOS/std1.npy", "Standard deviation noise e1 (gal).")
+flags.DEFINE_string("std2", "../data/COSMOS/std2.npy", "Standard deviation noise e2 (gal).")
 flags.DEFINE_float("sigma_gamma", 0.15, "Standard deviation of shear.")
 flags.DEFINE_float("spectral_norm", 1, "Amount of spectral normalization.")
 flags.DEFINE_string("variant", "EiffL", "Variant of model.")
@@ -98,6 +100,8 @@ def main(_):
     sn_state = 0.
 
   mask = jnp.expand_dims(fits.getdata(FLAGS.mask).astype('float32'), 0) # has shape [1, FLAGS.map_size,FLAGS.map_size]
+  std1 = jnp.expand_dims(jnp.load(FLAGS.std1).astype('float32'), 0)
+  std2 = jnp.expand_dims(jnp.load(FLAGS.std2).astype('float32'), 0)
 
   # Training loss
   def loss_fn(params, state, rng_key, batch):
@@ -108,8 +112,15 @@ def main(_):
     g1, g2 = ks93inv(input_map, jnp.zeros_like(input_map))
     
     # Add Gaussian noise and mask
-    g1 = mask * (g1 + FLAGS.sigma_gamma*jax.random.normal(key1, g1.shape))
-    g2 = mask * (g2 + FLAGS.sigma_gamma*jax.random.normal(key2, g2.shape))
+    # cte std per pixel
+    #g1 = mask * (g1 + FLAGS.sigma_gamma*jax.random.normal(key1, g1.shape))
+    #g2 = mask * (g2 + FLAGS.sigma_gamma*jax.random.normal(key2, g2.shape))
+
+    # std = std/sqrt(n_gal)
+    g1 = mask * (g1 + std1*jax.random.normal(key1, g1.shape))
+    g2 = mask * (g2 + std2*jax.random.normal(key2, g2.shape))
+
+
     ks_map, _ = ks93(g1, g2)
     ks_map = jnp.expand_dims(ks_map,-1)
     
