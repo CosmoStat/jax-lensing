@@ -50,7 +50,7 @@ FLAGS = flags.FLAGS
 
 def forward_fn(x, is_training=False):
   if FLAGS.model == 'SmallUResNet':
-    model = SmallUResNet(n_output_channels=1, variant=FLAGS.variant)
+    model = SmallUResNet(n_output_channels=1, variant=FLAGS.variant, deepmass=True)
   elif FLAGS.model == 'MediumUResNet':
     model = MediumUResNet()
   else:
