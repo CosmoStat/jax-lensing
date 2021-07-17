@@ -1,3 +1,4 @@
+# Code for this resnet is borrowed from the haiku examples
 import jax
 import jax.image as ji
 import jax.numpy as jnp
@@ -15,8 +16,97 @@ def upsample(image):
     upsampled_image = ji.resize(image, [b, 2*h, 2*w, c], 'nearest')
     return upsampled_image
 
-class BlockV1NoStride(hk.Module):
+class BlockV1(hk.Module):
   """ResNet V1 block with optional bottleneck."""
+
+  def __init__(
+      self,
+      channels: int,
+      stride: Union[int, Sequence[int]],
+      use_projection: bool,
+      bn_config: Mapping[str, float],
+      bottleneck: bool,
+      transpose: bool = False,
+      name: Optional[str] = None
+  ):
+    super().__init__(name=name)
+    self.use_projection = use_projection
+
+    bn_config = dict(bn_config)
+    bn_config.setdefault("create_scale", True)
+    bn_config.setdefault("create_offset", True)
+    bn_config.setdefault("decay_rate", 0.999)
+
+    if transpose:
+      maybe_transposed_conv = hk.Conv2DTranspose
+    else:
+      maybe_transposed_conv = hk.Conv2D
+
+    if self.use_projection:
+      self.proj_conv = maybe_transposed_conv(
+          output_channels=channels,
+          kernel_shape=1,
+          stride=stride,
+          with_bias=False,
+          padding="SAME",
+          name="shortcut_conv")
+
+      self.proj_batchnorm = hk.BatchNorm(name="shortcut_batchnorm", **bn_config)
+
+    channel_div = 4 if bottleneck else 1
+    conv_0 = hk.Conv2D(
+        output_channels=channels // channel_div,
+        kernel_shape=1 if bottleneck else 3,
+        stride=1,
+        with_bias=False,
+        padding="SAME",
+        name="conv_0")
+    bn_0 = hk.BatchNorm(name="batchnorm_0", **bn_config)
+
+    conv_1 = maybe_transposed_conv(
+        output_channels=channels // channel_div,
+        kernel_shape=3,
+        stride=stride,
+        with_bias=False,
+        padding="SAME",
+        name="conv_1")
+
+    bn_1 = hk.BatchNorm(name="batchnorm_1", **bn_config)
+    layers = ((conv_0, bn_0), (conv_1, bn_1))
+
+    if bottleneck:
+      conv_2 = hk.Conv2D(
+          output_channels=channels,
+          kernel_shape=1,
+          stride=1,
+          with_bias=False,
+          padding="SAME",
+          name="conv_2")
+
+      bn_2 = hk.BatchNorm(name="batchnorm_2", scale_init=jnp.zeros, **bn_config)
+      layers = layers + ((conv_2, bn_2),)
+
+    self.layers = layers
+
+  def __call__(self, inputs, is_training, test_local_stats):
+    out = shortcut = inputs
+
+    if self.use_projection:
+      shortcut = self.proj_conv(shortcut)
+      shortcut = self.proj_batchnorm(shortcut, is_training, test_local_stats)
+
+    for i, (conv_i, bn_i) in enumerate(self.layers):
+      out = conv_i(out)
+      out = bn_i(out, is_training, test_local_stats)
+      if i < len(self.layers) - 1:  # Don't apply relu on last layer
+        out = jax.nn.relu(out)
+
+    return jax.nn.relu(out + shortcut)
+
+
+class BlockV1NoStride(hk.Module):
+  """ResNet V1 block using upsampling layer instead of transpose
+  convolution"""
 
   def __init__(
       self,
@@ -188,8 +278,6 @@ class UResNet(hk.Module):
                n_output_channels=1,
                use_bn=True,
                pad_crop=False,
-               variant='EiffL',
-               deepmass=False,
                name=None):
     """Constructs a Residual UNet model based on a traditional ResNet.
     Args:
@@ -224,8 +312,6 @@ class UResNet(hk.Module):
     bn_config.setdefault("eps", 1e-5)
     bn_config.setdefault("create_scale", True)
     bn_config.setdefault("create_offset", True)
-    self.variant = variant
-    self.deepmass = deepmass
     self.strides = strides
     bl = len(self.strides)
 
@@ -276,21 +362,6 @@ class UResNet(hk.Module):
     if self.resnet_v2 and self.use_bn:
       self.final_batchnorm = hk.BatchNorm(name="final_batchnorm", **bn_config)
 
-    if self.variant == "Zacc":
-      self.final_up_conv = hk.Conv2D(
-          output_channels=channels_per_group[0]*self.n_output_channels//2,
-          kernel_shape=5,
-          stride=1,
-          padding="SAME",
-          name="final_up_conv",
-      )
-      self.antepenultian_conv = hk.Conv2D(
-          output_channels=channels_per_group[0]*self.n_output_channels//2,
-          kernel_shape=3,
-          stride=1,
-          padding='SAME',
-          name='antepenultian_conv',
-      )
     self.final_conv = hk.Conv2D(
         output_channels=self.n_output_channels,
         kernel_shape=5,
@@ -299,42 +370,36 @@ class UResNet(hk.Module):
         name='final_conv',
     )
 
-
-  def __call__(self, inputs, condition, is_training, test_local_stats=False):
+  def __call__(self, inputs, condition=None, is_training=False, test_local_stats=False):
     out = inputs
     if self.pad_crop:
         out, padding = pad_for_pool(inputs, 4)
-    out = jnp.concatenate([out, condition*jnp.ones_like(out)[...,[0]]], axis=-1)
+    
+    if condition is not None:
+      out = jnp.concatenate([out, condition*jnp.ones_like(out)[...,[0]]], axis=-1)
+
     out = self.initial_conv(out)
-    if self.variant == "Zacc":
-      out = self.pooling(out)
     # Decreasing resolution
     levels = []
     for block_group in self.block_groups:
       levels.append(out)
       out = block_group(out, is_training, test_local_stats)
-    out = jnp.concatenate([out, condition*jnp.ones_like(out)],axis=-1)
+
+    if condition is not None:
+      out = jnp.concatenate([out, condition*jnp.ones_like(out)],axis=-1)
     
     # Increasing resolution
     for i, block_group in enumerate(self.up_block_groups[::-1]):
       out = block_group(out, is_training, test_local_stats)
       out = jnp.concatenate([out, levels[-i-1]],axis=-1)
 
-    # Second to last upsampling, merging with input branch
-    if self.variant == "Zacc":
-      out = self.upsampling(out)
-      out = self.final_up_conv(out)
-      out = self.antepenultian_conv(out)
-      out = jax.nn.relu(out)
-
     out = self.final_conv(out)
-    if self.pad_crop:
-        condition_normalisation = (jnp.abs(condition)*jnp.ones_like(pad_for_pool(inputs, 4)[0])+1e-3)
-    else:
-        condition_normalisation = (jnp.abs(condition)*jnp.ones_like(inputs)+1e-3)
-    if self.deepmass:
-      out = out
-    else: 
+
+    if condition is not None:
+      if self.pad_crop:
+          condition_normalisation = (jnp.abs(condition)*jnp.ones_like(pad_for_pool(inputs, 4)[0])+1e-3)
+      else:
+          condition_normalisation = (jnp.abs(condition)*jnp.ones_like(inputs)+1e-3)
       out = out / condition_normalisation
     
     if self.pad_crop:
@@ -342,7 +407,7 @@ class UResNet(hk.Module):
             out = out[:, :, padding[0]:-padding[1]]
     return out
 
-class SmallUResNet(UResNet):
+class UResNet18(UResNet):
   """ResNet18."""
 
   def __init__(self,
@@ -350,7 +415,6 @@ class SmallUResNet(UResNet):
                use_bn: bool = True,
                pad_crop: bool = False,
                n_output_channels: int = 1,
-               variant: Optional[str] = 'EiffL',
                deepmass: Optional[bool] = False,
                name: Optional[str] = None):
     """Constructs a ResNet model.
@@ -376,6 +440,4 @@ class SmallUResNet(UResNet):
                      use_bn=use_bn,
                      pad_crop=pad_crop,
                      n_output_channels=n_output_channels,
-                     variant=variant,
-                     deepmass=deepmass,
                      name=name)
