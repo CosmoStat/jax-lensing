@@ -189,6 +189,7 @@ class UResNet(hk.Module):
                use_bn=True,
                pad_crop=False,
                variant='EiffL',
+               deepmass=False,
                name=None):
     """Constructs a Residual UNet model based on a traditional ResNet.
     Args:
@@ -224,6 +225,7 @@ class UResNet(hk.Module):
     bn_config.setdefault("create_scale", True)
     bn_config.setdefault("create_offset", True)
     self.variant = variant
+    self.deepmass = deepmass
     self.strides = strides
     bl = len(self.strides)
 
@@ -302,7 +304,6 @@ class UResNet(hk.Module):
     out = inputs
     if self.pad_crop:
         out, padding = pad_for_pool(inputs, 4)
-    
     out = jnp.concatenate([out, condition*jnp.ones_like(out)[...,[0]]], axis=-1)
     out = self.initial_conv(out)
     if self.variant == "Zacc":
@@ -331,7 +332,11 @@ class UResNet(hk.Module):
         condition_normalisation = (jnp.abs(condition)*jnp.ones_like(pad_for_pool(inputs, 4)[0])+1e-3)
     else:
         condition_normalisation = (jnp.abs(condition)*jnp.ones_like(inputs)+1e-3)
-    out = out / condition_normalisation
+    if self.deepmass:
+      out = out
+    else: 
+      out = out / condition_normalisation
+    
     if self.pad_crop:
         if not jnp.sum(padding) == 0:
             out = out[:, :, padding[0]:-padding[1]]
@@ -346,6 +351,7 @@ class SmallUResNet(UResNet):
                pad_crop: bool = False,
                n_output_channels: int = 1,
                variant: Optional[str] = 'EiffL',
+               deepmass: Optional[bool] = False,
                name: Optional[str] = None):
     """Constructs a ResNet model.
     Args:
@@ -370,4 +376,5 @@ class SmallUResNet(UResNet):
                      pad_crop=pad_crop,
                      n_output_channels=n_output_channels,
                      variant=variant,
+                     deepmass=deepmass,
                      name=name)
