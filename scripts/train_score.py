@@ -38,7 +38,7 @@ flags.DEFINE_float("resolution", 0.29, "Resolution in arcmin/pixel")
 FLAGS = flags.FLAGS
 
 def forward_fn(x, s, is_training=False):
-  denoiser = UResNet18(n_output_channels=1)
+  denoiser = UResNet18(n_output_channels=1, pad_crop=True)
   return denoiser(x, s, is_training=is_training)
 
 def log_gaussian_prior(map_data, sigma, ps_map):
