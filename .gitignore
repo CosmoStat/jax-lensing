@@ -129,4 +129,5 @@ dmypy.json
 .pyre/
 
 # Exclude private catalog data
-.asc
+*.asc
+
