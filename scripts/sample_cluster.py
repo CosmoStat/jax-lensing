@@ -70,14 +70,14 @@ def forward_fn(x, s, is_training=False):
 def log_gaussian_prior(map_data, sigma, ps_map):
   """ Gaussian prior on the power spectrum of the map
   """
-  data_ft = jnp.fft.fft2(map_data) / FLAGS.map_size
+  data_ft = jnp.fft.fft2(map_data) / map_data.shape[0]
   return -0.5*jnp.sum(jnp.real(data_ft*jnp.conj(data_ft)) / (ps_map+sigma**2))
 gaussian_prior_score = jax.vmap(jax.grad(log_gaussian_prior), in_axes=[0,0, None])
 
 def log_likelihood(x, sigma, meas_shear, mask):
   """ Likelihood function at the level of the measured shear
   """
-  ke = x.reshape((FLAGS.map_size, FLAGS.map_size))
+  ke = x.reshape((mask.shape[0], mask.shape[0]))
   kb = jnp.zeros(ke.shape)
   model_shear = jnp.stack(ks93inv(ke, kb), axis=-1)
   if FLAGS.reduced_shear:
@@ -86,11 +86,14 @@ def log_likelihood(x, sigma, meas_shear, mask):
 likelihood_score = jax.vmap(jax.grad(log_likelihood), in_axes=[0,0, None, None])
 
 def main(_):
+
+  map_size = fits.getdata(FLAGS.mask).astype('float32').shape[0]
+
   # Make the network
   model = hk.transform_with_state(forward_fn)
   rng_seq = hk.PRNGSequence(42)
   params, state = model.init(next(rng_seq),
-                             jnp.zeros((1, FLAGS.map_size, FLAGS.map_size, 2)),
+                             jnp.zeros((1, map_size, map_size, 2)),
                              jnp.zeros((1, 1, 1, 1)), is_training=True)
 
   # Load the weights of the neural network
@@ -106,17 +109,17 @@ def main(_):
   # 4th channel for massivenu
   ps_halofit = jnp.array(ps_data[1,:] / pixel_size**2) # normalisation by pixel size
   # convert to pixel units of our simple power spectrum calculator
-  #kell = ell / (360/3.5/0.5) / float(FLAGS.map_size)
-  kell = ell /2/jnp.pi * 360 * pixel_size / FLAGS.map_size
+  #kell = ell / (360/3.5/0.5) / float(map_size)
+  kell = ell /2/jnp.pi * 360 * pixel_size / map_size
   # Interpolate the Power Spectrum in Fourier Space
-  power_map = jnp.array(make_power_map(ps_halofit, FLAGS.map_size, kps=kell))
+  power_map = jnp.array(make_power_map(ps_halofit, map_size, kps=kell))
 
 
   # Load the noiseless convergence map
   if not FLAGS.COSMOS:
     print('i am here')
     convergence= fits.getdata(FLAGS.convergence).astype('float32')
-    #convergence = onp.load(FLAGS.convergence).astype('float32') #Convergence is expected in the format [FLAGS.map_size,FLAGS.map_size,1]
+    #convergence = onp.load(FLAGS.convergence).astype('float32') #Convergence is expected in the format [map_size,map_size,1]
   
     # Get the correspinding shear
     gamma1, gamma2 = ks93inv(convergence, onp.zeros_like(convergence)) 
@@ -126,7 +129,7 @@ def main(_):
       # Compute NFW profile shear map
       g1_NFW, g2_NFW = gen_nfw_shear(x_cen=FLAGS.x_cluster, y_cen=FLAGS.y_cluster, 
                                    resolution=FLAGS.resolution,
-                                   nx=FLAGS.map_size, ny=FLAGS.map_size, z=FLAGS.z_halo,
+                                   nx=map_size, ny=map_size, z=FLAGS.z_halo,
                                    m=FLAGS.mass_halo, zs=FLAGS.zs)
       # Shear with added NFW cluster
       gamma1 += g1_NFW
@@ -137,32 +140,32 @@ def main(_):
       #ke_cluster, kb_cluster = ks93(g1_cluster, g2_cluster)
 
     # Add noise the shear map
-    gamma1 += FLAGS.sigma_gamma * onp.random.randn(FLAGS.map_size,FLAGS.map_size)
-    gamma2 += FLAGS.sigma_gamma * onp.random.randn(FLAGS.map_size,FLAGS.map_size)
+    gamma1 += FLAGS.sigma_gamma * onp.random.randn(map_size,map_size)
+    gamma2 += FLAGS.sigma_gamma * onp.random.randn(map_size,map_size)
 
 
     # Load the shear maps and corresponding mask
-    gamma = onp.stack([gamma1, gamma2], -1) # Shear is expected in the format [FLAGS.map_size,FLAGS.map_size,2]
-    #mask = jnp.expand_dims(onp.ones_like(gamma1), -1) # has shape [FLAGS.map_size,FLAGS.map_size,1]
+    gamma = onp.stack([gamma1, gamma2], -1) # Shear is expected in the format [map_size,map_size,2]
+    #mask = jnp.expand_dims(onp.ones_like(gamma1), -1) # has shape [map_size,map_size,1]
 
-    #gamma = fits.getdata(FLAGS.shear).astype('float32') # Shear is expected in the format [FLAGS.map_size,FLAGS.map_size,2]
-    #mask = jnp.expand_dims(fits.getdata(FLAGS.mask).astype('float32'), -1) # has shape [FLAGS.map_size,FLAGS.map_size,1]
+    #gamma = fits.getdata(FLAGS.shear).astype('float32') # Shear is expected in the format [map_size,map_size,2]
+    #mask = jnp.expand_dims(fits.getdata(FLAGS.mask).astype('float32'), -1) # has shape [map_size,map_size,1]
 
   else:
 
     # Load the shear maps and corresponding mask
-    g1 = fits.getdata('../data/COSMOS/cosmos_full_e1_0.29arcmin360.fits').astype('float32').reshape([FLAGS.map_size, FLAGS.map_size, 1])
-    g2 = fits.getdata('../data/COSMOS/cosmos_full_e2_0.29arcmin360.fits').astype('float32').reshape([FLAGS.map_size, FLAGS.map_size, 1])
+    g1 = fits.getdata('../data/COSMOS/cosmos_full_e1_0.29arcmin360.fits').astype('float32').reshape([map_size, map_size, 1])
+    g2 = fits.getdata('../data/COSMOS/cosmos_full_e2_0.29arcmin360.fits').astype('float32').reshape([map_size, map_size, 1])
     gamma = onp.concatenate([g1, g2], axis=-1)
 
-  mask = jnp.expand_dims(fits.getdata(FLAGS.mask).astype('float32'), -1) # has shape [FLAGS.map_size,FLAGS.map_size,1]
+  mask = jnp.expand_dims(fits.getdata(FLAGS.mask).astype('float32'), -1) # has shape [map_size,map_size,1]
 
   @jax.jit
   def total_score_fn(x, sigma):
     """ Compute the total score, combining the following components:
         gaussian prior, ml prior, data likelihood
     """
-    x = x.reshape([FLAGS.batch_size, FLAGS.map_size, FLAGS.map_size])
+    x = x.reshape([FLAGS.batch_size, map_size, map_size])
     # Retrieve Gaussian score
     gaussian_score = gaussian_prior_score(x, sigma, power_map)
     if FLAGS.gaussian_only:
@@ -173,17 +176,17 @@ def main(_):
       ml_score = residual_prior_score(net_input, sigma.reshape([-1,1,1,1]))[0][...,0]
     # Compute likelihood score
     data_score = likelihood_score(x, sigma, gamma, mask)
-    return (data_score + gaussian_score + ml_score).reshape((-1,FLAGS.map_size*FLAGS.map_size))
+    return (data_score + gaussian_score + ml_score).reshape((-1,map_size*map_size))
 
 
   # Prepare the first guess convergence by adding noise in the holes and performing
   # a KS inversion
   print(gamma.shape)
   print(jnp.repeat(jnp.expand_dims(mask*gamma,0), FLAGS.batch_size, axis=0).shape)
-  print((jnp.expand_dims((1. - mask)*FLAGS.sigma_gamma,0)*onp.random.randn(FLAGS.batch_size, FLAGS.map_size, FLAGS.map_size, 2)).shape)
+  print((jnp.expand_dims((1. - mask)*FLAGS.sigma_gamma,0)*onp.random.randn(FLAGS.batch_size, map_size, map_size, 2)).shape)
   gamma_init = (jnp.repeat(jnp.expand_dims(mask*gamma,0), FLAGS.batch_size, axis=0) +
                 
-                jnp.expand_dims((1. - mask)*FLAGS.sigma_gamma,0)*onp.random.randn(FLAGS.batch_size, FLAGS.map_size, FLAGS.map_size, 2))
+                jnp.expand_dims((1. - mask)*FLAGS.sigma_gamma,0)*onp.random.randn(FLAGS.batch_size, map_size, map_size, 2))
   kappa_init, _ = jax.vmap(ks93)(gamma_init[...,0], gamma_init[...,1])
   # we only care about kappa_e
 
