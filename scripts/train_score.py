@@ -102,7 +102,6 @@ def main(_):
     # Interpolate the Power Spectrum in Fourier Space
     power_map = jnp.array(make_power_map(ps_halofit, FLAGS.map_size, kps=kell))
 
-  @jax.jit
   def score_fn(params, state, batch, is_training=True):
     if FLAGS.gaussian_prior:
       # If requested, first compute the Gaussian prior
