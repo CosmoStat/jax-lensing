@@ -102,7 +102,8 @@ def main(_):
     # Interpolate the Power Spectrum in Fourier Space
     power_map = jnp.array(make_power_map(ps_halofit, FLAGS.map_size, kps=kell))
 
-  def score_fn(params, state, rng_key, batch, is_training=True):
+  @jax.jit
+  def score_fn(params, state, batch, is_training=True):
     if FLAGS.gaussian_prior:
       # If requested, first compute the Gaussian prior
       gaussian_score = gaussian_prior_score(batch['y'][...,0], batch['s'][...,0], power_map)
@@ -116,7 +117,7 @@ def main(_):
 
   # Training loss
   def loss_fn(params, state, rng_key, batch):
-    _, res, state, gaussian_score = score_fn(params, state, rng_key, batch)
+    _, res, state, gaussian_score = score_fn(params, state, batch)
     loss = jnp.mean((batch['u'] + batch['s'] * (res + gaussian_score))**2)
     return loss, state
 
@@ -141,14 +142,13 @@ def main(_):
                                                       next(rng_seq), opt_state,
                                                       next(train))
 
-    summary_writer.scalar('train_loss', loss, step)
-
-    if step%100==0:
-        print(step, loss)
+    if step%50==0:
+      summary_writer.scalar('train_loss', loss, step)
+      print(step, loss)
 
     if step%500==0:
       # Running denoiser on a batch of images
-      batch, res, _, gs = score_fn(params, state, next(rng_seq), next(train), is_training=False)
+      batch, res, _, gs = score_fn(params, state, next(train), is_training=False)
       summary_writer.image('score/target', onp.clip(batch['x'][0,:,:,0], 0, 0.1)*10., step)
       summary_writer.image('score/input', onp.clip(batch['y'][0,:,:,0], 0, 0.1)*10., step)
       summary_writer.image('score/score', res[0,:,:,0]+gs[0,:,:,0], step)
