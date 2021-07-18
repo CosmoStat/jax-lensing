@@ -28,4 +28,4 @@ python scripts/train_score.py --output_dir=$ALL_CCFRWORK/Remy2021/score_sn1.0_st
                               --learning_rate=0.0001 \
                               --training_steps=45000 \
                               --noise_dist_std=0.2 \
-                              --spectral_norm=1 
+                              --spectral_norm=1.0 
