@@ -402,8 +402,7 @@ class UResNet(hk.Module):
       out = out / condition_normalisation
     
     if self.pad_crop:
-        if not jnp.sum(padding) == 0:
-            out = out[:, padding[0]:-padding[1], padding[0]:-padding[1]]
+        out = out[:, padding[0]:-padding[1], padding[0]:-padding[1]]
     return out
 
 class UResNet18(UResNet):
