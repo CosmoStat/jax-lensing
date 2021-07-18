@@ -148,7 +148,7 @@ def main(_):
 
     if step%500==0:
       # Running denoiser on a batch of images
-      batch, res, gs = score_fn(params, state, next(rng_seq), next(train), is_training=False)
+      batch, res, _, gs = score_fn(params, state, next(rng_seq), next(train), is_training=False)
       summary_writer.image('score/target', onp.clip(batch['x'][0], 0, 0.1)*10., step)
       summary_writer.image('score/input', onp.clip(batch['y'][0], 0, 0.1)*10., step)
       summary_writer.image('score/score', res[0]+gs[0], step)
