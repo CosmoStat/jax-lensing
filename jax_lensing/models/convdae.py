@@ -398,7 +398,7 @@ class UResNet(hk.Module):
       if self.pad_crop:
           condition_normalisation = (jnp.abs(condition)*jnp.ones_like(pad_for_pool(inputs, 4)[0])+1e-3)
       else:
-          condition_normalisation = (jnp.abs(condition)*jnp.ones_like(inputs)+1e-3)
+          condition_normalisation = (jnp.abs(condition)*jnp.ones_like(out)+1e-3)
       out = out / condition_normalisation
     
     if self.pad_crop:
