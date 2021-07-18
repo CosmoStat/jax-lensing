@@ -23,4 +23,9 @@ set -x
 
 # exécution du code
 cd $WORK/repo/jax-lensing
-python scripts/train_score.py --output_dir=$ALL_CCFRWORK/Remy2021/score_sn1.0_std0.2
+python scripts/train_score.py --output_dir=$ALL_CCFRWORK/Remy2021/score_sn1.0_std0.2 \
+                              --batch_size=32 \
+                              --learning_rate=0.0001 \
+                              --training_steps=45000 \
+                              --noise_dist_std=0.2 \
+                              --spectral_norm=1 
