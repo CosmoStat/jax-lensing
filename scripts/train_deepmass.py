@@ -1,7 +1,4 @@
 # Script for training a DeepMass inference model
-import os
-os.environ['XLA_FLAGS']='--xla_gpu_cuda_data_dir=/gpfslocalsys/cuda/10.1.2'
-
 from absl import app
 from absl import flags
 
@@ -22,13 +19,12 @@ import tensorflow_datasets as tfds
 
 from jax_lensing.models.convdae import UResNet18
 from jax_lensing.models.normalization import SNParamsTree
-from jax_lensing.spectral import make_power_map
 from jax_lensing.utils import load_dataset_deepmass
 from jax_lensing.inversion import ks93, ks93inv
 
 flags.DEFINE_string("dataset", "kappatng", "Suite of simulations to learn from")
 flags.DEFINE_string("output_dir", "./weights/deepmass-sn1v2", "Folder where to store model.")
-flags.DEFINE_integer("batch_size", 28, "Size of the batch to train on.")
+flags.DEFINE_integer("batch_size", 32, "Size of the batch to train on.")
 flags.DEFINE_float("learning_rate", 0.0001, "Learning rate for the optimizer.")
 flags.DEFINE_integer("training_steps", 45000, "Number of training steps to run.")
 flags.DEFINE_string("train_split", "90%", "How much of the training set to use.")
