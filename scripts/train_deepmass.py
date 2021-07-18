@@ -77,7 +77,7 @@ def main(_):
   rng_seq = hk.PRNGSequence(42)
 
   params, state = model.init(next(rng_seq),
-                             jnp.zeros((1, FLAGS.map_size, FLAGS.map_size, 1)),
+                             jnp.zeros((1, FLAGS.map_size, FLAGS.map_size, 2)),
                              is_training=True)
   opt_state = optimizer.init(params)
 
