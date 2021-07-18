@@ -37,7 +37,6 @@ flags.DEFINE_string("std1", "../data/COSMOS/std1.npy", "Standard deviation noise
 flags.DEFINE_string("std2", "../data/COSMOS/std2.npy", "Standard deviation noise e2 (gal).")
 flags.DEFINE_float("spectral_norm", 1, "Amount of spectral normalization.")
 flags.DEFINE_integer("map_size", 360, "Size of maps after cropping")
-flags.DEFINE_float("resolution", 0.29, "Resolution in arcmin/pixel")
 
 FLAGS = flags.FLAGS
 
