@@ -1,9 +1,4 @@
 # Script for sampling constrained realisations
-import os
-# This line is for running on Jean Zay
-os.environ['XLA_FLAGS']='--xla_gpu_cuda_data_dir=/gpfslocalsys/cuda/10.1.2'
-
-
 from absl import app
 from absl import flags
 import haiku as hk
@@ -15,18 +10,14 @@ from functools import partial
 from astropy.io import fits
 
 # Import tensorflow for dataset creation and manipulation
-import tensorflow.compat.v2 as tf
-tf.enable_v2_behavior()
+import tensorflow as tf
 
-from jax_lensing.models.convdae import SmallUResNet
-from jax_lensing.models.convdae2 import MediumUResNet
-from jax_lensing.models.normalization import SNParamsTree as CustomSNParamsTree
+from jax_lensing.models.convdae import UResNet18
 from jax_lensing.spectral import make_power_map
 from jax_lensing.inversion import ks93inv, ks93
 from jax_lensing.cluster import gen_nfw_shear
 from jax_lensing.samplers.procedures import tempered_HMC
-
-import tensorflow_probability as tfp; tfp = tfp.experimental.substrates.jax
+import tensorflow_probability as tfp; tfp = tfp.substrates.jax
 
 flags.DEFINE_string("output_folder", "100_100_.5_3e14_1", "Name of the output folder.")
 flags.DEFINE_string("output_file", "samples.fits", "Filename of output samples.")
@@ -35,8 +26,6 @@ flags.DEFINE_string("convergence", "convergence.npy", "Path to input noiseless c
 flags.DEFINE_string("mask", "mask.fits", "Path to input mask.")
 flags.DEFINE_float("sigma_gamma", 0.15, "Standard deviation of shear.")
 flags.DEFINE_string("model_weights", "model-final.pckl", "Path to trained model weights.")
-flags.DEFINE_string("variant", "EiffL", "Variant of model.")
-flags.DEFINE_string("model", "SmallUResNet", "Name of model.")
 flags.DEFINE_integer("batch_size", 5, "Size of batch to sample in parallel.")
 flags.DEFINE_float("initial_temperature", 0.15, "Initial temperature at which to start sampling.")
 flags.DEFINE_float("initial_step_size", 0.01, "Initial step size at which to perform sampling.")
@@ -59,12 +48,7 @@ flags.DEFINE_boolean("COSMOS", False, "COSMOS catalog")
 FLAGS = flags.FLAGS
 
 def forward_fn(x, s, is_training=False):
-  if FLAGS.model == 'SmallUResNet':
-    denoiser = SmallUResNet(n_output_channels=1, variant=FLAGS.variant)
-  elif FLAGS.model == 'MediumUResNet':
-    denoiser = MediumUResNet()
-  else:
-    raise NotImplementedError
+  denoiser = UResNet18(n_output_channels=1)
   return denoiser(x, s, is_training=is_training)
 
 def log_gaussian_prior(map_data, sigma, ps_map):
@@ -109,7 +93,6 @@ def main(_):
   # 4th channel for massivenu
   ps_halofit = jnp.array(ps_data[1,:] / pixel_size**2) # normalisation by pixel size
   # convert to pixel units of our simple power spectrum calculator
-  #kell = ell / (360/3.5/0.5) / float(map_size)
   kell = ell /2/jnp.pi * 360 * pixel_size / map_size
   # Interpolate the Power Spectrum in Fourier Space
   power_map = jnp.array(make_power_map(ps_halofit, map_size, kps=kell))
