@@ -149,11 +149,11 @@ def main(_):
     if step%500==0:
       # Running denoiser on a batch of images
       batch, res, _, gs = score_fn(params, state, next(rng_seq), next(train), is_training=False)
-      summary_writer.image('score/target', onp.clip(batch['x'][0], 0, 0.1)*10., step)
-      summary_writer.image('score/input', onp.clip(batch['y'][0], 0, 0.1)*10., step)
-      summary_writer.image('score/score', res[0]+gs[0], step)
-      summary_writer.image('score/denoised', onp.clip(batch['y'][0] + batch['s'][0,:,:,0]**2 * (res[0]+gs[0]), 0, 0.1)*10., step)
-      summary_writer.image('score/gaussian_denoised', onp.clip(batch['y'][0] + batch['s'][0,:,:,0]**2 * gs[0], 0, 0.1)*10., step)
+      summary_writer.image('score/target', onp.clip(batch['x'][0,:,:,0], 0, 0.1)*10., step)
+      summary_writer.image('score/input', onp.clip(batch['y'][0,:,:,0], 0, 0.1)*10., step)
+      summary_writer.image('score/score', res[0,:,:,0]+gs[0], step)
+      summary_writer.image('score/denoised', onp.clip(batch['y'][0,:,:,0] + batch['s'][0,:,:,0]**2 * (res[0,:,:,0]+gs[0]), 0, 0.1)*10., step)
+      summary_writer.image('score/gaussian_denoised', onp.clip(batch['y'][0,:,:,0] + batch['s'][0,:,:,0]**2 * gs[0], 0, 0.1)*10., step)
       print(step)
 
     if step%5000 ==0:
