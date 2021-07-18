@@ -430,7 +430,7 @@ class UResNet18(UResNet):
                      bn_config=bn_config,
                      bottleneck=False,
                      channels_per_group=(32, 64, 128, 128),
-                     use_projection=(True, True, True, False),
+                     use_projection=(True, True, True, True),
                      # 320 -> 160 -> 80 -> 40
                      # 360 -> 180 -> 90 -> 45
                      strides=(2, 2, 2, 1),
