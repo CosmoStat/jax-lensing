@@ -365,8 +365,7 @@ class SmallUResNet(UResNet):
                      channels_per_group=(32, 64, 128, 128),
                      use_projection=(True, True, True, True),
                      # 320 -> 160 -> 80 -> 40
-                     # 360 -> 180 -> 90 -> 45
-                     strides=(2, 2, 2, 1),
+                     strides=(2, 2, 2, 2),
                      use_bn=use_bn,
                      pad_crop=pad_crop,
                      n_output_channels=n_output_channels,
