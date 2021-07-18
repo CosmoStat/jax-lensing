@@ -1,8 +1,4 @@
 # Script for training a denoiser
-import os
-
-os.environ['XLA_FLAGS']='--xla_gpu_cuda_data_dir=/gpfslocalsys/cuda/10.1.2'
-
 from absl import app
 from absl import flags
 
