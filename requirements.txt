@@ -1,7 +1,0 @@
-astropy==4.0.1.post1
-jax==0.1.76
-dm-haiku==0.0.2
-lenspack==0.1.0
-tensorflow-probability==0.11.1
-tensorflow-dataset==4.1.0
-

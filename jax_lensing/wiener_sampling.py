@@ -1,12 +1,7 @@
-import sys
-sys.path = ['../'] + sys.path
 import jax.numpy as jnp
 from jax import grad, jit, vmap
-from jax_lensing.spectral import make_power_map
 from jax_lensing.inversion import ks93inv, ks93
 import numpy as np
-import gc
-import jax
 from jax import lax
 
 def spin_wiener_filter(data_q, data_u, ncov_diag_Q,ncov_diag_U, input_ps_map_E, input_ps_map_B, iterations=10):

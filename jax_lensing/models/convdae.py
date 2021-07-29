@@ -256,8 +256,7 @@ def pad_for_pool(x, n_downsampling):
     padding = (n_pad//2, n_pad//2)
     paddings = [
         (0, 0),
-        (0, 0),  # here in the context of fastMRI there is nothing to worry about because the dim is 640 (128 x 5)
-        # even for brain data, it shouldn't be a problem, since it's 640, 512, or 768.
+        padding,
         padding,
         (0, 0),
     ]
@@ -399,12 +398,11 @@ class UResNet(hk.Module):
       if self.pad_crop:
           condition_normalisation = (jnp.abs(condition)*jnp.ones_like(pad_for_pool(inputs, 4)[0])+1e-3)
       else:
-          condition_normalisation = (jnp.abs(condition)*jnp.ones_like(inputs)+1e-3)
+          condition_normalisation = (jnp.abs(condition)*jnp.ones_like(out)+1e-3)
       out = out / condition_normalisation
     
     if self.pad_crop:
-        if not jnp.sum(padding) == 0:
-            out = out[:, :, padding[0]:-padding[1]]
+        out = out[:, padding[0]:-padding[1], padding[0]:-padding[1]]
     return out
 
 class UResNet18(UResNet):
@@ -415,7 +413,6 @@ class UResNet18(UResNet):
                use_bn: bool = True,
                pad_crop: bool = False,
                n_output_channels: int = 1,
-               deepmass: Optional[bool] = False,
                name: Optional[str] = None):
     """Constructs a ResNet model.
     Args:
@@ -435,7 +432,8 @@ class UResNet18(UResNet):
                      channels_per_group=(32, 64, 128, 128),
                      use_projection=(True, True, True, True),
                      # 320 -> 160 -> 80 -> 40
-                     strides=(2, 2, 2, 2),
+                     # 360 -> 180 -> 90 -> 45
+                     strides=(2, 2, 2, 1),
                      use_bn=use_bn,
                      pad_crop=pad_crop,
                      n_output_channels=n_output_channels,
