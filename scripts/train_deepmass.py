@@ -23,14 +23,14 @@ from jax_lensing.utils import load_dataset_deepmass
 from jax_lensing.inversion import ks93, ks93inv
 
 flags.DEFINE_string("dataset", "kappatng", "Suite of simulations to learn from")
-flags.DEFINE_string("output_dir", "./weights/deepmass-sn1v2", "Folder where to store model.")
+flags.DEFINE_string("output_dir", "/gpfswork/rech/xdy/commun/deepmass_sn1.0", "Folder where to store model.")
 flags.DEFINE_integer("batch_size", 32, "Size of the batch to train on.")
 flags.DEFINE_float("learning_rate", 0.0001, "Learning rate for the optimizer.")
 flags.DEFINE_integer("training_steps", 45000, "Number of training steps to run.")
 flags.DEFINE_string("train_split", "90%", "How much of the training set to use.")
 flags.DEFINE_string("mask", "../data/COSMOS/cosmos_full_mask_0.29arcmin360copy.fits", "Path to input mask.")
-flags.DEFINE_string("std1", "../data/COSMOS/std1.npy", "Standard deviation noise e1 (gal).")
-flags.DEFINE_string("std2", "../data/COSMOS/std2.npy", "Standard deviation noise e2 (gal).")
+flags.DEFINE_string("std1", "../data/COSMOS/std1.fits", "Standard deviation noise e1 (gal).")
+flags.DEFINE_string("std2", "../data/COSMOS/std2.fits", "Standard deviation noise e2 (gal).")
 flags.DEFINE_float("spectral_norm", 1, "Amount of spectral normalization.")
 flags.DEFINE_integer("map_size", 360, "Size of maps after cropping")
 
@@ -82,8 +82,10 @@ def main(_):
     sn_state = 0.
 
   mask = jnp.expand_dims(fits.getdata(FLAGS.mask).astype('float32'), 0) # has shape [1, FLAGS.map_size,FLAGS.map_size]
-  std1 = jnp.expand_dims(jnp.load(FLAGS.std1).astype('float32'), 0)
-  std2 = jnp.expand_dims(jnp.load(FLAGS.std2).astype('float32'), 0)
+  #std1 = jnp.expand_dims(jnp.load(FLAGS.std1).astype('float32'), 0)
+  #std2 = jnp.expand_dims(jnp.load(FLAGS.std2).astype('float32'), 0)
+  std1 = jnp.expand_dims(fits.getdata(FLAGS.std1).astype('float32'), 0)
+  std2 = jnp.expand_dims(fits.getdata(FLAGS.std2).astype('float32'), 0)
 
   @jax.jit
   def preprocess_batch(rng_key, batch):
