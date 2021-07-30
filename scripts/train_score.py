@@ -1,30 +1,24 @@
 # Script for training a denoiser
-import os
-
-os.environ['XLA_FLAGS']='--xla_gpu_cuda_data_dir=/gpfslocalsys/cuda/10.1.2'
-
 from absl import app
 from absl import flags
 
+from flax.metrics import tensorboard
 import haiku as hk
+import optax
+
 import jax
 import jax.numpy as jnp
-from jax.experimental import optix
 
 import numpy as onp
 import pickle
 from functools import partial
 
-from flax.metrics import tensorboard
-
 # Import tensorflow for dataset creation and manipulation
-import tensorflow.compat.v2 as tf
-tf.enable_v2_behavior()
+import tensorflow as tf
 import tensorflow_datasets as tfds
 
-#from jax_lensing.models.convdae2 import SmallUResNet, MediumUResNet
-from jax_lensing.models.convdae import SmallUResNet
-from jax_lensing.models.normalization import SNParamsTree as CustomSNParamsTree
+from jax_lensing.models import UResNet18
+from jax_lensing.models.normalization import SNParamsTree 
 from jax_lensing.spectral import make_power_map
 from jax_lensing.utils import load_dataset
 
@@ -38,23 +32,13 @@ flags.DEFINE_float("noise_dist_std", 0.2, "Standard deviation of the noise distr
 flags.DEFINE_float("spectral_norm", 1, "Amount of spectral normalization.")
 flags.DEFINE_boolean("gaussian_prior", True, "Whether to train including Gaussian prior information.")
 flags.DEFINE_string("gaussian_path", "data/ktng/ktng_PS_theory.npy", "Path to Massive Nu power spectrum.")
-flags.DEFINE_string("variant", "EiffL", "Variant of model.")
-#flags.DEFINE_string("model", "MediumUResNet", "Name of model.")
-flags.DEFINE_string("model", "SmallUResNet", "Name of model.")
 flags.DEFINE_integer("map_size", 360, "Size of maps after cropping")
 flags.DEFINE_float("resolution", 0.29, "Resolution in arcmin/pixel")
 
-
 FLAGS = flags.FLAGS
 
-
 def forward_fn(x, s, is_training=False):
-  if FLAGS.model == 'SmallUResNet':
-    denoiser = SmallUResNet(n_output_channels=1, variant=FLAGS.variant)
-  elif FLAGS.model == 'MediumUResNet':
-    denoiser = MediumUResNet()
-  else:
-    raise NotImplementedError
+  denoiser = UResNet18(n_output_channels=1)
   return denoiser(x, s, is_training=is_training)
 
 def log_gaussian_prior(map_data, sigma, ps_map):
@@ -76,16 +60,16 @@ def lr_schedule(step):
 
 def main(_):
   # Make the network
-  model = hk.transform_with_state(forward_fn)
+  model = hk.without_apply_rng(hk.transform_with_state(forward_fn))
 
   if FLAGS.spectral_norm > 0:
-    sn_fn = hk.transform_with_state(lambda x: CustomSNParamsTree(ignore_regex='[^?!.]*b$',
+    sn_fn = hk.transform_with_state(lambda x: SNParamsTree(ignore_regex='[^?!.]*b$|[^?!.]*offset$',
                                                               val=FLAGS.spectral_norm)(x))
 
   # Initialisation
-  optimizer = optix.chain(
-      optix.adam(learning_rate=FLAGS.learning_rate),
-      optix.scale_by_schedule(lr_schedule)
+  optimizer = optax.chain(
+      optax.adam(learning_rate=FLAGS.learning_rate),
+      optax.scale_by_schedule(lr_schedule)
   )
 
   rng_seq = hk.PRNGSequence(42)
@@ -114,26 +98,25 @@ def main(_):
     # massivenu: channel 4
     ps_halofit = jnp.array(ps_data[1,:] / pixel_size**2) # normalisation by pixel size
     # convert to pixel units of our simple power spectrum calculator
-    #kell = ell / (360/3.5/0.5) / float(FLAGS.map_size)
     kell = ell /2/jnp.pi * 360 * pixel_size / FLAGS.map_size
     # Interpolate the Power Spectrum in Fourier Space
     power_map = jnp.array(make_power_map(ps_halofit, FLAGS.map_size, kps=kell))
 
-  def score_fn(params, state, rng_key, batch, is_training=True):
+  def score_fn(params, state, batch, is_training=True):
     if FLAGS.gaussian_prior:
       # If requested, first compute the Gaussian prior
       gaussian_score = gaussian_prior_score(batch['y'][...,0], batch['s'][...,0], power_map)
       gaussian_score = jnp.expand_dims(gaussian_score, axis=-1)
       net_input = jnp.concatenate([batch['y'], jnp.abs(batch['s'])**2 * gaussian_score],axis=-1)
-      res, state = model.apply(params, state, rng_key, net_input, batch['s'], is_training=is_training)
+      res, state = model.apply(params, state, net_input, batch['s'], is_training=is_training)
     else:
-      res, state = model.apply(params, state, rng_key, batch['y'], batch['s'], is_training=is_training)
+      res, state = model.apply(params, state, batch['y'], batch['s'], is_training=is_training)
       gaussian_score = jnp.zeros_like(res)
-    return batch, res, gaussian_score
+    return batch, res, state, gaussian_score
 
   # Training loss
   def loss_fn(params, state, rng_key, batch):
-    _, res, gaussian_score = score_fn(params, state, rng_key, batch)
+    _, res, state, gaussian_score = score_fn(params, state, batch)
     loss = jnp.mean((batch['u'] + batch['s'] * (res + gaussian_score))**2)
     return loss, state
 
@@ -141,7 +124,7 @@ def main(_):
   def update(params, state, sn_state, rng_key, opt_state, batch):
     (loss, state), grads = jax.value_and_grad(loss_fn, has_aux=True)(params, state, rng_key, batch)
     updates, new_opt_state = optimizer.update(grads, opt_state)
-    new_params = optix.apply_updates(params, updates)
+    new_params = optax.apply_updates(params, updates)
     if FLAGS.spectral_norm > 0:
       new_params, new_sn_state = sn_fn.apply(None, sn_state, None, new_params)
     else:
@@ -158,19 +141,18 @@ def main(_):
                                                       next(rng_seq), opt_state,
                                                       next(train))
 
-    summary_writer.scalar('train_loss', loss, step)
-
-    if step%100==0:
-        print(step, loss)
+    if step%50==0:
+      summary_writer.scalar('train_loss', loss, step)
+      print(step, loss)
 
     if step%500==0:
       # Running denoiser on a batch of images
-      batch, res, gs = score_fn(params, state, next(rng_seq), next(train), is_training=False)
-      summary_writer.image('score/target', onp.clip(batch['x'][0], 0, 0.1)*10., step)
-      summary_writer.image('score/input', onp.clip(batch['y'][0], 0, 0.1)*10., step)
-      summary_writer.image('score/score', res[0]+gs[0], step)
-      summary_writer.image('score/denoised', onp.clip(batch['y'][0] + batch['s'][0,:,:,0]**2 * (res[0]+gs[0]), 0, 0.1)*10., step)
-      summary_writer.image('score/gaussian_denoised', onp.clip(batch['y'][0] + batch['s'][0,:,:,0]**2 * gs[0], 0, 0.1)*10., step)
+      batch, res, _, gs = score_fn(params, state, next(train), is_training=False)
+      summary_writer.image('score/target', onp.clip(batch['x'][0,:,:,0], 0, 0.1)*10., step)
+      summary_writer.image('score/input', onp.clip(batch['y'][0,:,:,0], 0, 0.1)*10., step)
+      summary_writer.image('score/score', res[0,:,:,0]+gs[0,:,:,0], step)
+      summary_writer.image('score/denoised', onp.clip(batch['y'][0,:,:,0] + batch['s'][0,:,:,0]**2 * (res[0,:,:,0]+gs[0,:,:,0]), 0, 0.1)*10., step)
+      summary_writer.image('score/gaussian_denoised', onp.clip(batch['y'][0,:,:,0] + batch['s'][0,:,:,0]**2 * gs[0,:,:,0], 0, 0.1)*10., step)
       print(step)
 
     if step%5000 ==0:
