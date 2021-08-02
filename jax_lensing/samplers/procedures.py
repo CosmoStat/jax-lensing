@@ -3,7 +3,7 @@ from jax_lensing.samplers.tempered_sampling import TemperedMC
 import numpy as np
 import jax.numpy as jnp
 import jax
-import tensorflow_probability as tfp; tfp = tfp.experimental.substrates.jax
+import tensorflow_probability as tfp; tfp = tfp.substrates.jax
 
 def tempered_HMC(init_image,
                  total_score_fn,

@@ -6,8 +6,8 @@ from __future__ import print_function
 
 import jax
 import jax.numpy as jnp
-import tensorflow_probability as tfp; tfp = tfp.experimental.substrates.jax
-from tensorflow_probability.python.mcmc.internal._jax import util as mcmc_util
+import tensorflow_probability as tfp; tfp = tfp.substrates.jax
+from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 __all__ = [
     'ScoreUncalibratedHamiltonianMonteCarlo',
@@ -24,8 +24,8 @@ class ScoreUncalibratedHamiltonianMonteCarlo(tfp.mcmc.UncalibratedHamiltonianMon
                num_delta_logp_steps,
                target_log_prob_fn=None,
                state_gradients_are_stopped=False,
-               seed=None,
                store_parameters_in_results=False,
+               experimental_shard_axis_names=None,
                name=None):
 
     if target_log_prob_fn is None:
@@ -46,9 +46,10 @@ class ScoreUncalibratedHamiltonianMonteCarlo(tfp.mcmc.UncalibratedHamiltonianMon
     super().__init__(target_log_prob_fn,
                      step_size,
                      num_leapfrog_steps,
-                     state_gradients_are_stopped,
-                     seed,
-                     store_parameters_in_results, name)
+                     state_gradients_are_stopped=state_gradients_are_stopped,
+                     name=name,
+                     experimental_shard_axis_names=experimental_shard_axis_names,
+                     store_parameters_in_results=store_parameters_in_results)
     self._parameters['target_score_fn'] = target_score_fn
     self._parameters['num_delta_logp_steps'] = num_delta_logp_steps
 
@@ -140,6 +141,7 @@ class ScoreHamiltonianMonteCarlo(tfp.mcmc.HamiltonianMonteCarlo):
                target_log_prob_fn=None,
                seed=None,
                store_parameters_in_results=False,
+               experimental_shard_axis_names=None,
                name=None):
     """Initializes this transition kernel.
     Args:
@@ -194,7 +196,7 @@ class ScoreHamiltonianMonteCarlo(tfp.mcmc.HamiltonianMonteCarlo):
             name=name or 'hmc_kernel',
             store_parameters_in_results=store_parameters_in_results,
             **uhmc_kwargs),
-        **mh_kwargs)
+        **mh_kwargs).experimental_with_shard_axes(experimental_shard_axis_names)
     self._parameters = self._impl.inner_kernel.parameters.copy()
     self._parameters['step_size_update_fn'] = step_size_update_fn
     self._parameters['seed'] = seed
