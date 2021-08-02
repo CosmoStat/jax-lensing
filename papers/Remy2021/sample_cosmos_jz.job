@@ -1,0 +1,48 @@
+#!/bin/bash
+#SBATCH -A xdy@gpu
+#SBATCH --job-name=sample_cosmos%j   # nom du job
+#SBATCH --ntasks=1                    # nombre de tâche MPI
+#SBATCH --ntasks-per-node=1           # nombre de tâche MPI par noeud
+#SBATCH --gres=gpu:1                  # nombre de GPU à réserver par nœud
+#SBATCH --cpus-per-task=10            # nombre de coeurs à réserver par tâche
+# /!\ Attention, la ligne suivante est trompeuse mais dans le vocabulaire
+# de Slurm "multithread" fait bien référence à l'hyperthreading.
+#SBATCH --hint=nomultithread          # on réserve des coeurs physiques et non logiques
+#SBATCH --distribution=block:block    # on épingle les tâches sur des coeurs contigus
+#SBATCH --time=40:00:00               # temps d’exécution maximum demande (HH:MM:SS)
+#SBATCH --qos=qos_gpu-t4
+#SBATCH --output=sample_cosmos%j.out # nom du fichier de sortie
+#SBATCH --error=sample_cosmos%j.err  # nom du fichier d'erreur (ici commun avec la sortie)
+
+set -x
+
+cd $WORK/repo/jl/scripts
+
+module purge
+module load tensorflow-gpu/py3/2.5.0
+
+
+for i in {1..6}
+do
+  srun python ./sample_ODE.py --convergence=../data/ktng/ktng_kappa360v2.fits\
+                        --mask=../data/COSMOS/cosmos_full_mask_0.29arcmin360copy.fits\
+                        --num_steps=10\
+                        --sigma_gamma=0.148\
+                        --model_weights=/gpfswork/rech/xdy/commun/Remy2021/score_sn1.0_std0.2/model-40000.pckl\
+                        --batch_size=50\
+                        --initial_temperature=1.45\
+                        --gaussian_only=False\
+                        --reduced_shear=False\
+                        --gaussian_path=../data/ktng/ktng_PS_theory.npy\
+                        --gaussian_prior=True\
+                        --output_file=88\
+                        --output_folder=cosmos/\
+                        --x_cluster=65\
+                        --y_cluster=130\
+                        --z_halo=.5\
+                        --mass_halo=6e14\
+                        --zs=1\
+                        --no_cluster=True\
+                        --COSMOS=True
+
+done
