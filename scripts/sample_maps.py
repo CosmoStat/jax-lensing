@@ -1,3 +1,8 @@
+# Script for training a denoiser
+import os
+
+os.environ['XLA_FLAGS']='--xla_gpu_cuda_data_dir=/gpfslocalsys/cuda/11.1.0'
+
 # Script for sampling constrained realisations
 from absl import app
 from absl import flags
@@ -31,6 +36,8 @@ flags.DEFINE_integer("min_steps_per_temp", 10, "Minimum number of steps for each
 flags.DEFINE_integer("num_steps", 5000, "Total number of steps in the chains.")
 flags.DEFINE_integer("output_steps", 3, "How many steps to output.")
 flags.DEFINE_string("gaussian_path", "data/massivenu/mnu0.0_Maps10_PS_theory.npy", "Path to Massive Nu power spectrum.")
+flags.DEFINE_string("std1", "../data/COSMOS/std1.fits", "Standard deviation noise e1 (gal).")
+flags.DEFINE_string("std2", "../data/COSMOS/std2.fits", "Standard deviation noise e2 (gal).")
 flags.DEFINE_boolean("gaussian_only", False, "Only use Gaussian score if yes.")
 flags.DEFINE_boolean("reduced_shear", False, "Apply reduced shear correction if yes.")
 flags.DEFINE_boolean("gaussian_prior", True, "Uses a Gaussian prior or not.")
@@ -62,22 +69,23 @@ def log_gaussian_prior_b(map_data, sigma):
 
 gaussian_prior_score_b = jax.vmap(jax.grad(log_gaussian_prior_b), in_axes=[0,0])
 
-def log_likelihood(x, sigma, meas_shear, sigma_mask):
-  """ Likelihood function at the level of the measured shear
-  """
-  x = x.reshape((360, 360,2))
-  ke = x[...,0]
-  kb = x[...,1]
-  #print(sigma)
-  #sigma = sigma[0]
-  model_shear = jnp.stack(ks93inv(ke, kb), axis=-1)
-
-  return - jnp.sum((model_shear - meas_shear)**2/((FLAGS.sigma_gamma)**2 + sigma**2 + sigma_mask) )/2.
-
-likelihood_score = jax.vmap(jax.grad(log_likelihood), in_axes=[0,0, None, None])
-
-
 def main(_):
+
+  std1 = jnp.expand_dims(fits.getdata(FLAGS.std1).astype('float32'), -1)
+  std2 = jnp.expand_dims(fits.getdata(FLAGS.std2).astype('float32'), -1)
+  sigma_gamma = jnp.concatenate([std1, std2], axis=-1)
+
+  def log_likelihood(x, sigma, meas_shear, sigma_mask):
+    """ Likelihood function at the level of the measured shear
+    """
+    x = x.reshape((360, 360,2))
+    ke = x[...,0]
+    kb = x[...,1]
+    model_shear = jnp.stack(ks93inv(ke, kb), axis=-1)
+  
+    return - jnp.sum((model_shear - meas_shear)**2/((sigma_gamma)**2 + sigma**2 + sigma_mask) )/2.
+
+  likelihood_score = jax.vmap(jax.grad(log_likelihood), in_axes=[0,0, None, None])
 
   map_size = fits.getdata(FLAGS.mask).astype('float32').shape[0]
 
@@ -133,16 +141,12 @@ def main(_):
       #ke_cluster, kb_cluster = ks93(g1_cluster, g2_cluster)
 
     # Add noise the shear map
-    gamma1 += FLAGS.sigma_gamma * onp.random.randn(map_size,map_size)
-    gamma2 += FLAGS.sigma_gamma * onp.random.randn(map_size,map_size)
+    gamma1 += std1[...,0] * onp.random.randn(map_size,map_size)
+    gamma2 += std2[...,0] * onp.random.randn(map_size,map_size)
 
 
     # Load the shear maps and corresponding mask
     gamma = onp.stack([gamma1, gamma2], -1) # Shear is expected in the format [map_size,map_size,2]
-    #mask = jnp.expand_dims(onp.ones_like(gamma1), -1) # has shape [map_size,map_size,1]
-
-    #gamma = fits.getdata(FLAGS.shear).astype('float32') # Shear is expected in the format [map_size,map_size,2]
-    #mask = jnp.expand_dims(fits.getdata(FLAGS.mask).astype('float32'), -1) # has shape [map_size,map_size,1]
 
   else:
 
@@ -208,8 +212,6 @@ def main(_):
   
   @jax.jit
   def total_score_fn(x, sigma):
-    #sigma = sigma.reshape((x.shape[0],1,1,1))
-    #sl = likelihood_score(x, sigma, meas_shear, mask).reshape(-1, 360*360,2)
     sl = likelihood_score(x, sigma, masked_true_shear, sigma_mask).reshape(-1, 360*360,2)
     sp = score_prior(x, sigma)
     return (sl + sp).reshape(-1, 360*360*2)
