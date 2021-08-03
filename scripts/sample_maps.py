@@ -38,6 +38,10 @@ flags.DEFINE_integer("output_steps", 3, "How many steps to output.")
 flags.DEFINE_string("gaussian_path", "data/massivenu/mnu0.0_Maps10_PS_theory.npy", "Path to Massive Nu power spectrum.")
 flags.DEFINE_string("std1", "../data/COSMOS/std1.fits", "Standard deviation noise e1 (gal).")
 flags.DEFINE_string("std2", "../data/COSMOS/std2.fits", "Standard deviation noise e2 (gal).")
+flags.DEFINE_string("cosmos_noise_e1", "../data/COSMOS/cosmos_noise_real1.fits", "Cosmos noise realisation e1.")
+flags.DEFINE_string("cosmos_noise_e2", "../data/COSMOS/cosmos_noise_real2.fits", "Cosmos noise realisation e2.")
+flags.DEFINE_string("gaussian_noise", "../data/COSMOS/gaussian_realisation.fits", "Gaussian noise realisation [e1, e2]")
+flags.DEFINE_boolean("cosmos_noise_realisation", False, "Uses Cosmos noise realisation or not.")
 flags.DEFINE_boolean("gaussian_only", False, "Only use Gaussian score if yes.")
 flags.DEFINE_boolean("reduced_shear", False, "Apply reduced shear correction if yes.")
 flags.DEFINE_boolean("gaussian_prior", True, "Uses a Gaussian prior or not.")
@@ -141,8 +145,15 @@ def main(_):
       #ke_cluster, kb_cluster = ks93(g1_cluster, g2_cluster)
 
     # Add noise the shear map
-    gamma1 += std1[...,0] * onp.random.randn(map_size,map_size)
-    gamma2 += std2[...,0] * onp.random.randn(map_size,map_size)
+    if FLAGS.cosmos_noise_realisation:
+      print('cosmos noise real')
+      gamma1 += fits.getdata(FLAGS.cosmos_noise_e1).astype('float32')
+      gamma2 += fits.getdata(FLAGS.cosmos_noise_e2).astype('float32')
+
+    else:
+      gaussian_noise = fits.getdata(FLAGS.gaussian_noise).astype('float32')
+      gamma1 += gaussian_noise[...,0] #std1[...,0] * onp.random.randn(map_size,map_size)
+      gamma2 += gaussian_noise[...,1] #std2[...,0] * onp.random.randn(map_size,map_size)
 
 
     # Load the shear maps and corresponding mask
