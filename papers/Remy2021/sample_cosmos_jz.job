@@ -27,7 +27,6 @@ for i in {1..6}
 do
   srun python ./sample_maps.py --convergence=../data/ktng/ktng_kappa360v2.fits\
                         --mask=../data/COSMOS/cosmos_full_mask_0.29arcmin360copy.fits\
-                        --num_steps=10\
                         --sigma_gamma=0.148\
                         --model_weights=/gpfswork/rech/xdy/commun/Remy2021/score_sn1.0_std0.2/model-40000.pckl\
                         --batch_size=50\
