@@ -13,6 +13,7 @@
 #SBATCH --qos=qos_gpu-t4
 #SBATCH --output=sample_cosmos%j.out # nom du fichier de sortie
 #SBATCH --error=sample_cosmos%j.err  # nom du fichier d'erreur (ici commun avec la sortie)
+#SBATCH -C v100-32g
 
 set -x
 
@@ -24,7 +25,7 @@ module load tensorflow-gpu/py3/2.5.0
 
 for i in {1..6}
 do
-  srun python ./sample_ODE.py --convergence=../data/ktng/ktng_kappa360v2.fits\
+  srun python ./sample_maps.py --convergence=../data/ktng/ktng_kappa360v2.fits\
                         --mask=../data/COSMOS/cosmos_full_mask_0.29arcmin360copy.fits\
                         --num_steps=10\
                         --sigma_gamma=0.148\
@@ -35,13 +36,8 @@ do
                         --reduced_shear=False\
                         --gaussian_path=../data/ktng/ktng_PS_theory.npy\
                         --gaussian_prior=True\
-                        --output_file=88\
+                        --output_file=$i\
                         --output_folder=cosmos/\
-                        --x_cluster=65\
-                        --y_cluster=130\
-                        --z_halo=.5\
-                        --mass_halo=6e14\
-                        --zs=1\
                         --no_cluster=True\
                         --COSMOS=True
 
