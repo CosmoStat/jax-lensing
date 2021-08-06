@@ -49,3 +49,26 @@ def load_dataset_deepmass(name, batch_size, crop_width, train_split):
   ds = ds.batch(batch_size)
   ds = ds.prefetch(tf.data.experimental.AUTOTUNE)
   return iter(tfds.as_numpy(ds))
+
+def bin2d(x, y, npix=10, v=None, w=None, size=None, verbose=False):
+
+  # Compute weighted bin count map 
+  wmap, xbins, ybins = jnp.histogram2d(x, y, bins=npix, range=[-size/2, size/2],
+                                        weights=w)
+  # Handle division by zero (i.e., empty pixels)
+  #wmap = jax.ops.index_update(wmap, jax.ops.index[jnp.where(wmap==0)], jnp.inf)
+  contours = jnp.load('../data/COSMOS/contours.npy')
+  wmap = wmap + contours
+  # Compute mean values per pixel
+  result = (jnp.histogram2d(x, y, bins=npix, range=[-size/2, size/2],
+                    weights=(v * w))[0] / wmap).T
+
+  return result
+
+def random_rotations(e1, e2, n, rng_key):
+  gamma1 = jnp.repeat(jnp.expand_dims(e1, 0), n, axis=0)
+  gamma2 = jnp.repeat(jnp.expand_dims(e2, 0), n, axis=0)
+  theta = jnp.pi * jax.random.normal(rng_key, gamma1.shape)
+  new_gamma1 = jnp.cos(theta) * gamma1 - jnp.sin(theta) * gamma2
+  new_gamma2 = jnp.sin(theta) * gamma1 + jnp.cos(theta) * gamma2
+  return new_gamma1, new_gamma2

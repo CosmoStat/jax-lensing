@@ -1,3 +1,7 @@
+import os
+
+os.environ['XLA_FLAGS']='--xla_gpu_cuda_data_dir=/gpfslocalsys/cuda/11.1.0'
+
 # Script for training a DeepMass inference model
 from absl import app
 from absl import flags
@@ -19,11 +23,11 @@ import tensorflow_datasets as tfds
 
 from jax_lensing.models.convdae import UResNet18
 from jax_lensing.models.normalization import SNParamsTree
-from jax_lensing.utils import load_dataset_deepmass
+from jax_lensing.utils import load_dataset_deepmass, bin2d, random_rotations
 from jax_lensing.inversion import ks93, ks93inv
 
 flags.DEFINE_string("dataset", "kappatng", "Suite of simulations to learn from")
-flags.DEFINE_string("output_dir", "/gpfswork/rech/xdy/commun/deepmass_sn1.0", "Folder where to store model.")
+flags.DEFINE_string("output_dir", "/gpfswork/rech/xdy/commun/Remy2021/deepmass_sn1_cosmos_noise", "Folder where to store model.")
 flags.DEFINE_integer("batch_size", 32, "Size of the batch to train on.")
 flags.DEFINE_float("learning_rate", 0.0001, "Learning rate for the optimizer.")
 flags.DEFINE_integer("training_steps", 45000, "Number of training steps to run.")
@@ -31,6 +35,12 @@ flags.DEFINE_string("train_split", "90%", "How much of the training set to use."
 flags.DEFINE_string("mask", "../data/COSMOS/cosmos_full_mask_0.29arcmin360copy.fits", "Path to input mask.")
 flags.DEFINE_string("std1", "../data/COSMOS/std1.fits", "Standard deviation noise e1 (gal).")
 flags.DEFINE_string("std2", "../data/COSMOS/std2.fits", "Standard deviation noise e2 (gal).")
+flags.DEFINE_boolean("gaussian_noise", False, "User Gaussian noise, or not")
+flags.DEFINE_string("e1", "../data/COSMOS/e1.fits", "COSMOS e1")
+flags.DEFINE_string("e2", "../data/COSMOS/e2.fits", "COSMOS e2")
+flags.DEFINE_string("ra", "../data/COSMOS/ra.fits", "COSMOS RA")
+flags.DEFINE_string("dec", "../data/COSMOS/dec.fits", "COSMOS DEC")
+flags.DEFINE_string("nhweight_int", "../data/COSMOS/nhweight_int.fits", "COSMOS nhweight_int")
 flags.DEFINE_float("spectral_norm", 1, "Amount of spectral normalization.")
 flags.DEFINE_integer("map_size", 360, "Size of maps after cropping")
 
@@ -55,7 +65,37 @@ def lr_schedule(step):
 ks93 = jax.vmap(ks93)
 ks93inv = jax.vmap(ks93inv)
 
+
 def main(_):
+  cat_ra = fits.getdata(FLAGS.ra).astype('float32')
+  cat_dec = fits.getdata(FLAGS.dec).astype('float32')
+  cat_nhi = fits.getdata(FLAGS.nhweight_int).astype('float32')
+  cat_e1 = fits.getdata(FLAGS.e1).astype('float32')
+  cat_e2 = fits.getdata(FLAGS.e2).astype('float32')
+  #w = cat_nhi, size=FLAGS.map_size * 0.29 / 60.
+  #x = cat_ra-jnp.median(cat_ra)
+  #y = cat_dec-jnp.median(cat_dec)
+  #w = cat_nhi
+  #npix = FLAGS.map_size
+
+  #def b2d(v):
+  #
+  #  # Compute weighted bin count map
+  #  wmap, xbins, ybins = jnp.histogram2d(x, y, bins=npix, range=[-size/2, size/2],
+  #                                      weights=w)
+  #  # Handle division by zero (i.e., empty pixels)
+  #  wmap = jax.ops.index_update(wmap, jax.ops.index[jnp.where(wmap==0)], jnp.inf)
+  #  # Compute mean values per pixel
+  #  result = (jnp.histogram2d(x, y, bins=npix, range=[-size/2, size/2],
+  #                  weights=(v * w))[0] / wmap).T
+  #
+  #  return result
+
+
+  b2d = partial(bin2d, x=cat_ra-jnp.median(cat_ra), y=cat_dec-jnp.median(cat_dec), 
+                     w=cat_nhi, size=FLAGS.map_size * 0.29 / 60.,
+                     npix=FLAGS.map_size)
+
   # Make the network
   model = hk.without_apply_rng(hk.transform_with_state(forward_fn))
 
@@ -96,10 +136,19 @@ def main(_):
     # do inverse Kaiser-Squires
     input_map = batch['x'][...,0]
     g1, g2 = ks93inv(input_map, jnp.zeros_like(input_map))
-    
-    # Add Gaussian noise and mask
-    g1 = mask * (g1 + std1*jax.random.normal(key1, g1.shape))
-    g2 = mask * (g2 + std2*jax.random.normal(key2, g2.shape))
+
+    if FLAGS.gaussian_noise:    
+      # Add Gaussian noise and mask
+      g1 = mask * (g1 + std1*jax.random.normal(key1, g1.shape))
+      g2 = mask * (g2 + std2*jax.random.normal(key2, g2.shape))
+    else:  
+      # COSMOS noise realisations 
+      random_e1, random_e2 = random_rotations(cat_e1, cat_e2, g1.shape[0], rng_key)
+      noise_e1 = jax.vmap(b2d)(v=random_e1)
+      noise_e2 = jax.vmap(b2d)(v=random_e2)
+
+      g1 = mask * (g1 + noise_e1)
+      g2 = mask * (g2 + noise_e2)
 
     ks_map = jnp.stack(ks93(g1, g2), axis=-1)
     return ks_map, input_map
