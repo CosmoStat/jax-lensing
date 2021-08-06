@@ -151,7 +151,7 @@ def main(_):
 
     else:
       gamma1 += std1[...,0] * jax.random.normal(jax.random.PRNGKey(42), gamma1.shape) #onp.random.randn(map_size,map_size)
-      gamma2 += std2[...,0] * jax.random.normal(jax.random.PRNGKey(42), gamma2.shape) #onp.random.randn(map_size,map_size)
+      gamma2 += std2[...,0] * jax.random.normal(jax.random.PRNGKey(43), gamma2.shape) #onp.random.randn(map_size,map_size)
 
     # Load the shear maps and corresponding mask
     gamma = onp.stack([gamma1, gamma2], -1) # Shear is expected in the format [map_size,map_size,2]
