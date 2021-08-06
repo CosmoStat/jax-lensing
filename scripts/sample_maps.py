@@ -40,7 +40,6 @@ flags.DEFINE_string("std1", "../data/COSMOS/std1.fits", "Standard deviation nois
 flags.DEFINE_string("std2", "../data/COSMOS/std2.fits", "Standard deviation noise e2 (gal).")
 flags.DEFINE_string("cosmos_noise_e1", "../data/COSMOS/cosmos_noise_real1.fits", "Cosmos noise realisation e1.")
 flags.DEFINE_string("cosmos_noise_e2", "../data/COSMOS/cosmos_noise_real2.fits", "Cosmos noise realisation e2.")
-flags.DEFINE_string("gaussian_noise", "../data/COSMOS/gaussian_realisation.fits", "Gaussian noise realisation [e1, e2]")
 flags.DEFINE_boolean("cosmos_noise_realisation", False, "Uses Cosmos noise realisation or not.")
 flags.DEFINE_boolean("gaussian_only", False, "Only use Gaussian score if yes.")
 flags.DEFINE_boolean("reduced_shear", False, "Apply reduced shear correction if yes.")
@@ -151,10 +150,8 @@ def main(_):
       gamma2 += fits.getdata(FLAGS.cosmos_noise_e2).astype('float32')
 
     else:
-      gaussian_noise = fits.getdata(FLAGS.gaussian_noise).astype('float32')
-      gamma1 += gaussian_noise[...,0] #std1[...,0] * onp.random.randn(map_size,map_size)
-      gamma2 += gaussian_noise[...,1] #std2[...,0] * onp.random.randn(map_size,map_size)
-
+      gamma1 += std1[...,0] * jax.random.normal(jax.random.PRNGKey(42), gamma1.shape) #onp.random.randn(map_size,map_size)
+      gamma2 += std2[...,0] * jax.random.normal(jax.random.PRNGKey(42), gamma2.shape) #onp.random.randn(map_size,map_size)
 
     # Load the shear maps and corresponding mask
     gamma = onp.stack([gamma1, gamma2], -1) # Shear is expected in the format [map_size,map_size,2]
