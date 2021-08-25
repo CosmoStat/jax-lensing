@@ -17,6 +17,9 @@ from astropy.io import fits
 # Import tensorflow for dataset creation and manipulation
 import tensorflow as tf
 
+import tensorflow_probability as tfp; tfp = tfp.substrates.jax
+from jax_lensing.samplers.score_samplers import ScoreHamiltonianMonteCarlo
+
 from jax_lensing.models.convdae import UResNet18
 from jax_lensing.spectral import make_power_map
 from jax_lensing.inversion import ks93inv, ks93
@@ -52,6 +55,7 @@ flags.DEFINE_float("z_halo", .5, "redshift of the cluster")
 flags.DEFINE_float("mass_halo", 2e15, "mass of the cluster (in solar mass)")
 flags.DEFINE_float("zs", 1, "redshif of the source")
 flags.DEFINE_boolean("COSMOS", False, "COSMOS catalog")
+flags.DEFINE_boolean("hmc", False, "Run HMC at high temp before SDE sampling")
 
 FLAGS = flags.FLAGS
 
@@ -231,6 +235,40 @@ def main(_):
                          FLAGS.initial_temperature*onp.random.randn(FLAGS.batch_size,360*360)], axis=-1)
 
 
+
+  tot_score = partial(total_score_fn, sigma=FLAGS.initial_temperature*jnp.ones((FLAGS.batch_size,1)))
+
+  hmc = ScoreHamiltonianMonteCarlo(
+        target_log_prob_fn=None,
+        target_score_fn=tot_score,
+        step_size=0.01,
+        #step_size=10*(np.max(sigma)/s0)**0.5,
+        num_leapfrog_steps=3,
+        num_delta_logp_steps=4)
+
+  num_results = int(3000)
+  num_burnin_steps = int(0)
+
+  def run_chain():
+    # Run the chain (with burn-in).
+    samples = tfp.mcmc.sample_chain(
+        #num_results=num_results
+        num_results=2,
+        num_steps_between_results=num_results//2,
+        num_burnin_steps=num_burnin_steps,
+        current_state=init_image.reshape([FLAGS.batch_size,-1]),
+        kernel=hmc,
+        trace_fn=None,
+        #trace_fn=lambda _, pkr: pkr.inner_results.is_accepted,
+        seed=jax.random.PRNGKey(42))
+
+    #is_accepted = tf.reduce_mean(tf.cast(is_accepted, dtype=tf.float32))
+    return samples#, is_accepted
+
+  if FLAGS.hmc:
+    samples = run_chain()
+    init_image = samples[-1,...]
+
   # Run the deterministic chain with the black-box ODE solver
   from scipy import integrate
 
@@ -253,7 +291,8 @@ def main(_):
   samples = solution.y[:,-1].reshape([FLAGS.batch_size,360,360,2])[...,0]
 
   fits.writeto("./results/"+FLAGS.output_folder+"/samples_"+FLAGS.output_file+".fits", onp.array(samples), overwrite=False)
-
+   
+  print('end of sampling')
   # print('average acceptance rate', onp.mean(trace[0]))
   # print('final max temperature', onp.max(trace[1][:,-1]))
   # # TODO: apply final projection

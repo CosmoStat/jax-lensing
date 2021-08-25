@@ -38,5 +38,6 @@ do
                         --output_folder=validation/same_gaussian_noise\
                         --cosmos_noise_realisation=False\
                         --no_cluster=True\
-                        --COSMOS=False
+                        --COSMOS=False\
+                        --hmc=True
 done
