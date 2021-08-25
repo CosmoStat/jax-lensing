@@ -72,25 +72,6 @@ def main(_):
   cat_nhi = fits.getdata(FLAGS.nhweight_int).astype('float32')
   cat_e1 = fits.getdata(FLAGS.e1).astype('float32')
   cat_e2 = fits.getdata(FLAGS.e2).astype('float32')
-  #w = cat_nhi, size=FLAGS.map_size * 0.29 / 60.
-  #x = cat_ra-jnp.median(cat_ra)
-  #y = cat_dec-jnp.median(cat_dec)
-  #w = cat_nhi
-  #npix = FLAGS.map_size
-
-  #def b2d(v):
-  #
-  #  # Compute weighted bin count map
-  #  wmap, xbins, ybins = jnp.histogram2d(x, y, bins=npix, range=[-size/2, size/2],
-  #                                      weights=w)
-  #  # Handle division by zero (i.e., empty pixels)
-  #  wmap = jax.ops.index_update(wmap, jax.ops.index[jnp.where(wmap==0)], jnp.inf)
-  #  # Compute mean values per pixel
-  #  result = (jnp.histogram2d(x, y, bins=npix, range=[-size/2, size/2],
-  #                  weights=(v * w))[0] / wmap).T
-  #
-  #  return result
-
 
   b2d = partial(bin2d, x=cat_ra-jnp.median(cat_ra), y=cat_dec-jnp.median(cat_dec), 
                      w=cat_nhi, size=FLAGS.map_size * 0.29 / 60.,
@@ -122,8 +103,6 @@ def main(_):
     sn_state = 0.
 
   mask = jnp.expand_dims(fits.getdata(FLAGS.mask).astype('float32'), 0) # has shape [1, FLAGS.map_size,FLAGS.map_size]
-  #std1 = jnp.expand_dims(jnp.load(FLAGS.std1).astype('float32'), 0)
-  #std2 = jnp.expand_dims(jnp.load(FLAGS.std2).astype('float32'), 0)
   std1 = jnp.expand_dims(fits.getdata(FLAGS.std1).astype('float32'), 0)
   std2 = jnp.expand_dims(fits.getdata(FLAGS.std2).astype('float32'), 0)
 
