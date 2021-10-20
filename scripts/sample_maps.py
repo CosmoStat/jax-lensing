@@ -170,7 +170,7 @@ def main(_):
   mask = jnp.expand_dims(fits.getdata(FLAGS.mask).astype('float32'), -1) # has shape [map_size,map_size,1]
 
   masked_true_shear = gamma * mask
-  sigma_mask = (1-mask)*10**3
+  sigma_mask = (1-mask)*1*10**3
 
   #@jax.jit
   #def total_score_fn(x, sigma):
