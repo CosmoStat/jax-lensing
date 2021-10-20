@@ -75,6 +75,7 @@ class TemperedMC(kernel_base.TransitionKernel):
                gamma,
                min_steps_per_temp,
                num_delta_logp_steps=4,
+               min_temp=0.,
                seed=None,
                validate_args=False,
                name=None):
@@ -91,6 +92,7 @@ class TemperedMC(kernel_base.TransitionKernel):
         arg and returns a `tfp.mcmc.TransitionKernel` instance. Passing a
         function taking `(target_log_prob_fn, seed)` deprecated but supported
         until 2020-09-20.
+      min_temp: float, mininum temperature at which to stop annealing
       seed: Python integer to seed the random number generator. Deprecated, pass
         seed to `tfp.mcmc.sample_chain`. Default value: `None` (i.e., no seed).
       validate_args: Python `bool`, default `False`. When `True` distribution
@@ -146,6 +148,10 @@ class TemperedMC(kernel_base.TransitionKernel):
   @property
   def gamma(self):
     return self._parameters['gamma']
+
+  @property
+  def min_temp(self):
+    return self._parameters['min_temp']
 
   @property
   def seed(self):
@@ -243,7 +249,7 @@ class TemperedMC(kernel_base.TransitionKernel):
 
       # Now that we have run one step, we consider maybe lowering the temperature
       # Proposed new temperature
-      proposed_inverse_temperatures = self.gamma * inverse_temperatures
+      proposed_inverse_temperatures = tf.clip_by_value(self.gamma * inverse_temperatures, self.min_temp, 1e6)
       dtype = inverse_temperatures.dtype
 
       # We will lower the temperature if this new proposed step is compatible with
