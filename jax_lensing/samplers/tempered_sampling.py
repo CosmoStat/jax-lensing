@@ -13,19 +13,17 @@ import jax.numpy as jnp
 
 from tensorflow_probability.python.internal.backend.jax.compat import v2 as tf
 
-from tensorflow_probability.python.internal._jax import assert_util
-from tensorflow_probability.python.internal._jax import distribution_util
-from tensorflow_probability.python.internal._jax import prefer_static
-from tensorflow_probability.python.internal._jax import samplers
-from tensorflow_probability.python.internal._jax import tensorshape_util
-from tensorflow_probability.python.mcmc._jax import hmc
-from tensorflow_probability.python.mcmc._jax import kernel as kernel_base
-from tensorflow_probability.python.mcmc._jax import metropolis_hastings
-from tensorflow_probability.python.mcmc._jax import random_walk_metropolis
-from tensorflow_probability.python.mcmc.internal._jax import util as mcmc_util
-from tensorflow_probability.python.util._jax.seed_stream import SeedStream
-from tensorflow_probability.python.internal.backend.jax import deprecation  # pylint: disable=g-direct-tensorflow-import
-
+from tensorflow_probability.substrates.jax.internal import assert_util
+from tensorflow_probability.substrates.jax.internal import broadcast_util as bu
+from tensorflow_probability.substrates.jax.internal import distribution_util
+from tensorflow_probability.substrates.jax.internal import prefer_static as ps
+from tensorflow_probability.substrates.jax.internal import samplers
+from tensorflow_probability.substrates.jax.internal import tensorshape_util
+from tensorflow_probability.substrates.jax.internal import unnest
+from tensorflow_probability.substrates.jax.mcmc import hmc
+from tensorflow_probability.substrates.jax.mcmc import kernel as kernel_base
+from tensorflow_probability.substrates.jax.mcmc.internal import util as mcmc_util
+from tensorflow_probability.substrates.jax.util.seed_stream import SeedStream
 
 __all__ = [
     'TemperedMC',
@@ -65,9 +63,9 @@ class TemperedMC(kernel_base.TransitionKernel):
   """Runs one step of the Replica Exchange Monte Carlo.
   """
 
-  @deprecation.deprecated_args(
-      '2020-09-20', 'The `seed` argument is deprecated (but will work until '
-      'removed). Pass seed to `tfp.mcmc.sample_chain` instead.', 'seed')
+  #@deprecation.deprecated_args(
+  #    '2020-09-20', 'The `seed` argument is deprecated (but will work until '
+  #    'removed). Pass seed to `tfp.mcmc.sample_chain` instead.', 'seed')
   def __init__(self,
                target_score_fn,
                inverse_temperatures,
@@ -92,9 +90,9 @@ class TemperedMC(kernel_base.TransitionKernel):
         arg and returns a `tfp.mcmc.TransitionKernel` instance. Passing a
         function taking `(target_log_prob_fn, seed)` deprecated but supported
         until 2020-09-20.
-      min_temp: float, mininum temperature at which to stop annealing
       seed: Python integer to seed the random number generator. Deprecated, pass
-        seed to `tfp.mcmc.sample_chain`. Default value: `None` (i.e., no seed).
+      min_temp: float, mininum temperature at which to stop annealing  
+      seed to `tfp.mcmc.sample_chain`. Default value: `None` (i.e., no seed).
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
