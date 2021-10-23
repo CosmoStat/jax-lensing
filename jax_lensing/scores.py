@@ -15,11 +15,11 @@ def log_gaussian_prior(x, sigma, ps_map):
   Returns:
     log prior
   """
-  data_ft = jnp.fft.fft2(x, axes=[0,1], norm="ortho")
+  data_ft = jnp.fft.fft2(x, axes=[0,1]) / x.shape[0]
   prior_E = -0.5*jnp.sum(jnp.real(data_ft[...,0]*jnp.conj(data_ft[...,0])) / (ps_map+sigma**2))
   prior_B = -0.5*jnp.sum(jnp.real(data_ft[...,1]*jnp.conj(data_ft[...,1])) / (sigma**2))
   return prior_E + prior_B
-  
+
 gaussian_prior_score = jax.vmap(jax.grad(log_gaussian_prior), in_axes=[0,0, None])
 
 def log_likelihood(x, sigma, meas_shear, sigma_gamma):
