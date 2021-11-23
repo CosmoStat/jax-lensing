@@ -13,6 +13,8 @@ import numpy as onp
 import pickle
 from functools import partial
 from astropy.io import fits
+import time
+
 
 # Import tensorflow for dataset creation and manipulation
 import tensorflow as tf
@@ -277,7 +279,7 @@ def main(_):
         trace_fn=lambda _, pkr: (pkr.pre_tempering_results.is_accepted,
                                  pkr.post_tempering_inverse_temperatures,
                                  pkr.tempering_log_accept_ratio),
-        seed=jax.random.PRNGKey(0))
+        seed=jax.random.PRNGKey(int(time.time())))
   
   sol = samples[-1, ...].reshape(-1, 360, 360)
 
