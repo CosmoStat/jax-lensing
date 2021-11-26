@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -A xdy@gpu
-#SBATCH --job-name=sample_cosmos%j   # nom du job
+#SBATCH --job-name=cosmos_hmc   # nom du job
 #SBATCH --ntasks=1                    # nombre de tâche MPI
 #SBATCH --ntasks-per-node=1           # nombre de tâche MPI par noeud
 #SBATCH --gres=gpu:1                  # nombre de GPU à réserver par nœud
@@ -9,10 +9,10 @@
 # de Slurm "multithread" fait bien référence à l'hyperthreading.
 #SBATCH --hint=nomultithread          # on réserve des coeurs physiques et non logiques
 #SBATCH --distribution=block:block    # on épingle les tâches sur des coeurs contigus
-#SBATCH --time=40:00:00               # temps d’exécution maximum demande (HH:MM:SS)
-#SBATCH --qos=qos_gpu-t4
-#SBATCH --output=sample_cosmos%j.out # nom du fichier de sortie
-#SBATCH --error=sample_cosmos%j.err  # nom du fichier d'erreur (ici commun avec la sortie)
+#SBATCH --time=20:00:00               # temps d’exécution maximum demande (HH:MM:SS)
+#SBATCH --qos=qos_gpu-t3
+#SBATCH --output=cosmos_hmc.out # nom du fichier de sortie
+#SBATCH --error=cosmos_hmc.err  # nom du fichier d'erreur (ici commun avec la sortie)
 #SBATCH -C v100-32g
 
 set -x
@@ -22,22 +22,22 @@ cd $WORK/repo/jl/scripts
 module purge
 module load tensorflow-gpu/py3/2.5.0
 
+for i in {1..10}
 
-for i in {1..6}
 do
-  srun python ./sample_maps.py --convergence=../data/ktng/ktng_kappa360v2.fits\
+  srun python ./sample_hmc.py --convergence=../data/ktng/ktng_kappa360v2.fits\
                         --mask=../data/COSMOS/cosmos_full_mask_0.29arcmin360copy.fits\
-                        --sigma_gamma=0.148\
-                        --model_weights=/gpfswork/rech/xdy/commun/Remy2021/score_sn1.0_std0.2/model-40000.pckl\
-                        --batch_size=50\
-                        --initial_temperature=1.45\
+                        --model_weights=/gpfswork/rech/xdy/commun/Remy2021/score_sn1.0_std0.2/model-final.pckl\
+                        --batch_size=10\
+                        --initial_step_size=0.013\
+                        --initial_temperature=1.\
                         --gaussian_only=False\
                         --reduced_shear=False\
                         --gaussian_path=../data/ktng/ktng_PS_theory.npy\
                         --gaussian_prior=True\
-                        --output_file=$i\
-                        --output_folder=cosmos/\
+			--output_file=$i\
+                        --output_folder=cosmos/annealed_hmc\
+                        --cosmos_noise_realisation=False\
                         --no_cluster=True\
                         --COSMOS=True
-
 done
