@@ -1,7 +1,7 @@
 # jax-lensing
 A JAX package for gravitational lensing 
 
-[![PyPI - License](https://img.shields.io/pypi/l/jax-cosmo)](https://github.com/CosmoStat/jax-lensing/tree/master/LICENSE)
+[![arXiv:2011.08271](https://img.shields.io/badge/astro--ph.CO-arXiv%3A2011.08271-B31B1B.svg)](https://arxiv.org/abs/2011.08271) [![License](https://img.shields.io/pypi/l/jax-cosmo)](https://github.com/CosmoStat/jax-lensing/tree/master/LICENSE)
 [![All Contributors](https://img.shields.io/badge/all_contributors-4-orange.svg?style=flat-square)](##contributors-)
 
 This repository contains scripts and notebook to reproduce the results from the following paper:
