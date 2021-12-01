@@ -16,7 +16,7 @@ This repository also contains implementation of the following methods:
 ## Convergence posterior sampling
 This package enables to sample **high resolution convergence map** from the posterior distribution in 10 GPU-minutes (on an Nvidia Tesla V100 GPU) in average. Have a look at the *annealed Hamiltonian Monte Carlo* sampling scheme bellow:
 
-<img height=250 src="assets/hmc-annealing.gif">
+<img width=700 src="assets/hmc-annealing.gif">
 
 ## Mass-mapping
 Comparison between
@@ -24,15 +24,15 @@ Comparison between
 
 | Ground truth convergence                      | `DLPosterior` samples                     |
 |-----------------------------------------------|-------------------------------------------|
-| <img height=250 src="assets/convergence.png"> | <img height=250 src="assets/cropped.gif"> |
+| <img height=300 src="assets/convergence.png"> | <img height=300 src="assets/cropped.gif"> |
 
 | `DeepMass`                                    | `DLPosterior` mean                        |
 |-----------------------------------------------|-------------------------------------------|
-| <img height=250 src="assets/deepmass.png">    | <img height=250 src="assets/dlp.png">     |
+| <img height=300 src="assets/deepmass.png">    | <img height=300 src="assets/dlp.png">     |
 
 | `Wiener Filter`                               | `Kaiser-Squires`                          |
 |-----------------------------------------------|-------------------------------------------|
-| <img height=250 src="assets/wiener.png">      | <img height=250 src="assets/ks.png">      |
+| <img height=300 src="assets/wiener.png">      | <img height=300 src="assets/ks.png">      |
 
 
 ## Install
