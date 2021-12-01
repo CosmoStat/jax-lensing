@@ -1,5 +1,8 @@
 # jax-lensing
-A JAX package for gravitational lensing
+A JAX package for gravitational lensing 
+
+[![PyPI - License](https://img.shields.io/pypi/l/jax-cosmo)](https://github.com/CosmoStat/jax-lensing/tree/master/LICENSE)
+[![All Contributors](https://img.shields.io/badge/all_contributors-4-orange.svg?style=flat-square)](##contributors-)
 
 This repository contains scripts and notebook to reproduce the results from the following paper:
 
@@ -63,3 +66,8 @@ The BibTeX citation is the following:
 ```
 @Upcomming
 ```
+
+## Contributors
+| [Benjamin Remy](https://www.cosmostat.org/people/benjamin-remy) | [François Lanusse](http://flanusse.net) | [Niall Jeffrey](https://nialljeffrey.github.io/) | [Jia Liu](https://liuxx479.github.io/) |
+|---|:---:|---|---|
+| <img src="https://avatars.githubusercontent.com/u/30293694?v=4" width="100px;"/> | <img src="https://avatars0.githubusercontent.com/u/861591?v=4?s=100" width="100px;"/>  | <img src="https://avatars.githubusercontent.com/u/15345794?v=4" width="100px;"/> | <img src="https://avatars.githubusercontent.com/u/2658222?v=4" width="100px;"/>  |
