@@ -2,7 +2,7 @@
 A JAX package for gravitational lensing 
 
 [![arXiv:2011.08271](https://img.shields.io/badge/astro--ph.CO-arXiv%3A2011.08271-B31B1B.svg)](https://arxiv.org/abs/2011.08271) [![License](https://img.shields.io/pypi/l/jax-cosmo)](https://github.com/CosmoStat/jax-lensing/tree/master/LICENSE)
-[![All Contributors](https://img.shields.io/badge/all_contributors-4-orange.svg?style=flat-square)](##contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-4-orange.svg?style=flat-square)](#contributors-)
 
 This repository contains scripts and notebook to reproduce the results from the following paper:
 
@@ -19,7 +19,7 @@ This repository also contains implementation of the following methods:
 ## Convergence posterior sampling
 This package enables to sample **high resolution convergence map** from the posterior distribution in 10 GPU-minutes (on an Nvidia Tesla V100 GPU) in average. Have a look at the *annealed Hamiltonian Monte Carlo* sampling scheme bellow:
 
-<img width=700 src="assets/hmc-annealing.gif">
+<img src="assets/video-annealing.gif">
 
 ## Mass-mapping
 Comparison between
