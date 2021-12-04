@@ -1,0 +1,26 @@
+{
+  "files": [
+    "README.md"
+  ],
+  "imageSize": 100,
+  "commit": false,
+  "contributors": [
+    {
+      "login": "b-remy",
+      "name": "Benjamin Remy",
+      "avatar_url": "https://avatars.githubusercontent.com/u/30293694?v=4",
+      "profile": "https://www.cosmostat.org/people/benjamin-remy",
+      "contributions": [
+        "infra",
+        "test",
+        "code"
+      ]
+    }
+  ],
+  "contributorsPerLine": 7,
+  "projectName": "jax-lensing",
+  "projectOwner": "CosmoStat",
+  "repoType": "github",
+  "repoHost": "https://github.com",
+  "skipCi": true
+}
