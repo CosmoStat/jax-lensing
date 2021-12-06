@@ -1,0 +1,57 @@
+{
+  "files": [
+    "README.md"
+  ],
+  "imageSize": 100,
+  "commit": false,
+  "contributors": [
+    {
+      "login": "b-remy",
+      "name": "Benjamin Remy",
+      "avatar_url": "https://avatars.githubusercontent.com/u/30293694?v=4",
+      "profile": "https://www.cosmostat.org/people/benjamin-remy",
+      "contributions": [
+        "infra",
+        "test",
+        "code"
+      ]
+    },
+    {
+      "login": "EiffL",
+      "name": "Francois Lanusse",
+      "avatar_url": "https://avatars.githubusercontent.com/u/861591?v=4",
+      "profile": "http://flanusse.net",
+      "contributions": [
+        "infra",
+        "test",
+        "code"
+      ]
+    },
+    {
+      "login": "NiallJeffrey",
+      "name": "Niall Jeffrey",
+      "avatar_url": "https://avatars.githubusercontent.com/u/15345794?v=4",
+      "profile": "https://nialljeffrey.github.io/",
+      "contributions": [
+        "test",
+        "code"
+      ]
+    },
+    {
+      "login": "liuxx479",
+      "name": "Jia Liu",
+      "avatar_url": "https://avatars.githubusercontent.com/u/2658222?v=4",
+      "profile": "https://liuxx479.github.io/",
+      "contributions": [
+        "test",
+        "code"
+      ]
+    }
+  ],
+  "contributorsPerLine": 7,
+  "projectName": "jax-lensing",
+  "projectOwner": "CosmoStat",
+  "repoType": "github",
+  "repoHost": "https://github.com",
+  "skipCi": true
+}
