@@ -1,6 +1,5 @@
 # jax-lensing
 
-<<<<<<< master
 [![arXiv:2011.08271](https://img.shields.io/badge/astro--ph.CO-arXiv%3A2011.08271-B31B1B.svg)](https://arxiv.org/abs/2011.08271) [![License](https://img.shields.io/pypi/l/jax-cosmo)](https://github.com/CosmoStat/jax-lensing/tree/master/LICENSE)
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
 [![All Contributors](https://img.shields.io/badge/all_contributors-4-orange.svg?style=flat-square)](#contributors-)
@@ -92,5 +91,3 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
 <!-- ALL-CONTRIBUTORS-LIST:END -->
 
 This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
-=======
->>>>>>> docs
