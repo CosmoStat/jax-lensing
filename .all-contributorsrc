@@ -36,6 +36,16 @@
         "test",
         "code"
       ]
+    },
+    {
+      "login": "liuxx479",
+      "name": "Jia Liu",
+      "avatar_url": "https://avatars.githubusercontent.com/u/2658222?v=4",
+      "profile": "https://liuxx479.github.io/",
+      "contributions": [
+        "test",
+        "code"
+      ]
     }
   ],
   "contributorsPerLine": 7,
