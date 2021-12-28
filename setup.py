@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(name='jax-lensing',
       version='0.1',
@@ -7,7 +7,7 @@ setup(name='jax-lensing',
       author='Benjamin Remy',
       author_email='benjamin.remy@cea.fr',
       license='MIT',
-      packages=['jax_lensing'],
+      packages=find_packages(),
       install_requires=["astropy", 
                         "jax>=0.2.17", 
                         "flax>=0.3.4",
