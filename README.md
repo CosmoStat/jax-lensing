@@ -9,7 +9,7 @@ This repository contains scripts and notebook to reproduce the results from the 
 
 [Probabilistic Mass-Mapping with Neural Score Estimation](https://arxiv.org/abs/2011.08271), B. Remy, F. Lanusse, N. Jeffrey, J. Liu, J.-L. Starck, K. Osato, T. Schrabback, submitted to Astronomy and Astrophisics, 2021.
 
-You will find all the scripts and instructions to reproduce traine models, sample maps and reproduce the paper figures [here](https://github.com/CosmoStat/jax-lensing/tree/master/papers/Remy2021).
+You will find all the scripts and instructions to reproduce traine models, sample maps and reproduce the paper figures [here](https://github.com/CosmoStat/jax-lensing/tree/master/papers/Remy2021). All the results of the paper, including posterior samples and neural network weights, were stored in a [Zenodo record](https://zenodo.org/record/5825654).
 
 This repository also contains implementation of the following methods:
 - [`DeepLensingPosterior`](https://arxiv.org/abs/2011.08271)
