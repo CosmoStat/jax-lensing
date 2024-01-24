@@ -374,11 +374,8 @@ class UResNet(hk.Module):
     if self.pad_crop:
         out, padding = pad_for_pool(inputs, 4)
     
-    #if condition is not None:
-    #  out = jnp.concatenate([out, condition*jnp.ones_like(out)[...,[0]]], axis=-1)
     if condition is not None:
       #condition is (nscalar,) --> (nbatch, imsize, imsize, nscalar) 
-    #  incondition = jnp.ones_like(out)[...,[0]]*condition
       out = jnp.concatenate([out, condition*jnp.ones_like(out)[...,[0]]], axis=-1)
 
     out = self.initial_conv(out)
@@ -388,8 +385,6 @@ class UResNet(hk.Module):
       levels.append(out)
       out = block_group(out, is_training, test_local_stats)
     
-    #if condition is not None:
-    #  out = jnp.concatenate([out, condition*jnp.ones_like(out)],axis=-1)
     if condition is not None:
       bncondition = jnp.ones_like(out)[...,[0]]*condition
       out = jnp.concatenate([out, bncondition],axis=-1)
