@@ -375,6 +375,7 @@ class UResNet(hk.Module):
         out, padding = pad_for_pool(inputs, 4)
     
     if condition is not None:
+      #condition is (nscalar,) --> (nbatch, imsize, imsize, nscalar) 
       out = jnp.concatenate([out, condition*jnp.ones_like(out)[...,[0]]], axis=-1)
 
     out = self.initial_conv(out)
@@ -383,9 +384,10 @@ class UResNet(hk.Module):
     for block_group in self.block_groups:
       levels.append(out)
       out = block_group(out, is_training, test_local_stats)
-
+    
     if condition is not None:
-      out = jnp.concatenate([out, condition*jnp.ones_like(out)],axis=-1)
+      bncondition = jnp.ones_like(out)[...,[0]]*condition
+      out = jnp.concatenate([out, bncondition],axis=-1)
     
     # Increasing resolution
     for i, block_group in enumerate(self.up_block_groups[::-1]):
@@ -396,9 +398,9 @@ class UResNet(hk.Module):
 
     if condition is not None:
       if self.pad_crop:
-          condition_normalisation = (jnp.abs(condition)*jnp.ones_like(pad_for_pool(inputs, 4)[0])+1e-3)
+          condition_normalisation = (jnp.abs(condition[...,[0]])*jnp.ones_like(pad_for_pool(inputs, 4)[0])+1e-3)
       else:
-          condition_normalisation = (jnp.abs(condition)*jnp.ones_like(out)+1e-3)
+          condition_normalisation = (jnp.abs(condition[...,[0]])*jnp.ones_like(out)+1e-3)
       out = out / condition_normalisation
     
     if self.pad_crop:
@@ -413,7 +415,11 @@ class UResNet18(UResNet):
                use_bn: bool = True,
                pad_crop: bool = False,
                n_output_channels: int = 1,
-               name: Optional[str] = None):
+               name: Optional[str] = None,
+               blocks_per_group=(2, 2, 2, 2),
+               channels_per_group=(32, 64, 128, 128),
+               use_projection=(True, True, True, True),
+               strides=(2, 2, 2, 1)):
     """Constructs a ResNet model.
     Args:
       bn_config: A dictionary of two elements, ``decay_rate`` and ``eps`` to be
@@ -426,14 +432,14 @@ class UResNet18(UResNet):
         the case of a complex denoising. Defaults to 1.
       name: Name of the module.
     """
-    super().__init__(blocks_per_group=(2, 2, 2, 2),
+    super().__init__(blocks_per_group=blocks_per_group,
                      bn_config=bn_config,
                      bottleneck=False,
-                     channels_per_group=(32, 64, 128, 128),
-                     use_projection=(True, True, True, True),
+                     channels_per_group=channels_per_group,
+                     use_projection=use_projection,
                      # 320 -> 160 -> 80 -> 40
                      # 360 -> 180 -> 90 -> 45
-                     strides=(2, 2, 2, 1),
+                     strides=strides,
                      use_bn=use_bn,
                      pad_crop=pad_crop,
                      n_output_channels=n_output_channels,
