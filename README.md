@@ -1,15 +1,20 @@
 # jax-lensing
 
-[![arXiv:2011.08271](https://img.shields.io/badge/astro--ph.CO-arXiv%3A2011.08271-B31B1B.svg)](https://arxiv.org/abs/2011.08271) [![License](https://img.shields.io/pypi/l/jax-cosmo)](https://github.com/CosmoStat/jax-lensing/tree/master/LICENSE)<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
+[![arXiv:2201.05561](https://img.shields.io/badge/astro--ph.CO-arXiv%3A2201.05561-B31B1B.svg)](https://arxiv.org/abs/2201.05561) [![License](https://img.shields.io/pypi/l/jax-cosmo)](https://github.com/CosmoStat/jax-lensing/tree/master/LICENSE)<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
 [![All Contributors](https://img.shields.io/badge/all_contributors-4-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 A JAX package for gravitational lensing
 
-This repository contains scripts and notebook to reproduce the results from the following paper:
+This repository contains scripts and notebook to reproduce the results from the
+following paper: 
 
-[Probabilistic Mass-Mapping with Neural Score Estimation](https://arxiv.org/abs/2011.08271), B. Remy, F. Lanusse, N. Jeffrey, J. Liu, J.-L. Starck, K. Osato, T. Schrabback, submitted to Astronomy and Astrophisics, 2021.
+B. Remy, F. Lanusse, N. Jeffrey, J. Liu, J.-L. Starck, K.
+Osato, T. Schrabback,
+[Probabilistic Mass-Mapping with Neural Score
+Estimation](https://www.aanda.org/articles/aa/full_html/2023/04/aa43054-22/aa43054-22.html),
+Astronomy & Astrophysics, 2023.
 
-You will find all the scripts and instructions to reproduce traine models, sample maps and reproduce the paper figures [here](https://github.com/CosmoStat/jax-lensing/tree/master/papers/Remy2021).
+You will find all the scripts and instructions to reproduce traine models, sample maps and reproduce the paper figures [here](https://github.com/CosmoStat/jax-lensing/tree/master/papers/Remy2021). All the results of the paper, including posterior samples and neural network weights, were stored in a [Zenodo record](https://zenodo.org/record/5825654).
 
 This repository also contains implementation of the following methods:
 - [`DeepLensingPosterior`](https://arxiv.org/abs/2011.08271)
@@ -60,13 +65,30 @@ $ pip install .
 
 If you use `jax-lensing` in a scientific publication, we would appreciate citations to the following paper:
 
-[Probabilistic Mass-Mapping with Neural Score Estimation](https://arxiv.org/abs/2011.08271), B. Remy, F. Lanusse, N. Jeffrey, J. Liu, J.-L. Starck, K. Osato, T. Schrabback, submitted to Astronomy and Astrophisics, 2021.
+B. Remy, F. Lanusse, N. Jeffrey, J. Liu, J.-L. Starck, K. Osato, T. Schrabback,
+[Probabilistic Mass-Mapping with Neural Score
+Estimation](https://www.aanda.org/articles/aa/full_html/2023/04/aa43054-22/aa43054-22.html),
+Astronomy & Astrophysics, 2023
 
+```
+@article{remy2023probabilistic,
+  title={Probabilistic mass-mapping with neural score estimation},
+  author={Remy, Benjamin and Lanusse, Francois and Jeffrey, Niall and Liu, Jia and Starck, J-L and Osato, Ken and Schrabback, Tim},
+  journal={Astronomy \& Astrophysics},
+  volume={672},
+  pages={A51},
+  year={2023},
+  publisher={EDP Sciences}
+}
+```
 
-The BibTeX citation is the following:
-```
-@Upcomming
-```
+**Preliminary works**
+
+- B. Remy, Z. Ramzi, F. Lanusse, J. Liu, J.-L. Starck. [Probabilistic Mapping of Dark Matter with Neural Score Matching](https://arxiv.org/abs/2011.08271), 3rd Machine Learning and the Physical Science workshop at
+NeurIPS, 2020
+
+- Z. Ramzi, B. Remy, F. Lanusse, J.-L. Starck, P. Ciuciu. [Denoising Score-Matching for Uncertainty Quantification in Inverse Problems](https://arxiv.org/abs/2011.08698), Deep inverse workshop at NeurIPS, 2020
+
 
 ## Contributors ✨
 
