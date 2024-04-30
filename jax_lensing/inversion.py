@@ -57,8 +57,7 @@ def ks93(g1, g2):
     p1 = k1 * k1 - k2 * k2
     p2 = 2 * k1 * k2
     k2 = k1 * k1 + k2 * k2
-    #k2[0, 0] = 1  # avoid division by 0
-    k2 = jax.ops.index_update(k2, jax.ops.index[0, 0], 1.) # avoid division by 0
+    k2 = k2.at[0, 0].set(1.) #avoid division by 0
     kEhat = (p1 * g1hat + p2 * g2hat) / k2
     kBhat = -(p2 * g1hat - p1 * g2hat) / k2
 
@@ -107,8 +106,7 @@ def ks93inv(kE, kB):
     p1 = k1 * k1 - k2 * k2
     p2 = 2 * k1 * k2
     k2 = k1 * k1 + k2 * k2
-    #k2[0, 0] = 1  # avoid division by 0
-    k2 = jax.ops.index_update(k2, jax.ops.index[0, 0], 1) # avoid division by 0
+    k2 = k2.at[0, 0].set(1.) #avoid division by 0
     g1hat = (p1 * kEhat - p2 * kBhat) / k2
     g2hat = (p2 * kEhat + p1 * kBhat) / k2
 
